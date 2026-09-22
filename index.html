@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<title>ระบบอัจฉริยะการเงินและบัญชีสถานศึกษา</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    fontFamily: { sans:['Kanit','sans-serif'], doc:['Sarabun','serif'] },
+    colors: { gov: {50:'#eef4fb',100:'#d8e6f6',200:'#b3cdec',300:'#82aade',400:'#4f83cc',
+                    500:'#2e64b3',600:'#1f4d94',700:'#1a3f7a',800:'#173461',900:'#122a4d'} }
+  }}
+}
+</script>
+<style>
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:'Kanit',sans-serif}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:#b3cdec;border-radius:8px}
+  .fade-in{animation:fi .25s ease}
+  @keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .slide-up{animation:su .28s cubic-bezier(.2,.8,.2,1)}
+  @keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:1rem;box-shadow:0 1px 2px rgba(15,23,42,.05)}
+  .inp{width:100%;border:1px solid #cbd5e1;border-radius:.6rem;padding:.55rem .75rem;font-size:.9rem;background:#fff}
+  .inp:focus{outline:none;border-color:#2e64b3;box-shadow:0 0 0 3px rgba(46,100,179,.15)}
+  .btn{display:inline-flex;align-items:center;gap:.4rem;border-radius:.6rem;padding:.55rem .9rem;font-size:.875rem;font-weight:500;transition:.15s}
+  .btn-p{background:#1f4d94;color:#fff}.btn-p:hover{background:#173461}
+  .btn-g{background:#e2e8f0;color:#334155}.btn-g:hover{background:#cbd5e1}
+  .btn-d{background:#dc2626;color:#fff}.btn-d:hover{background:#b91c1c}
+  .btn-s{background:#059669;color:#fff}.btn-s:hover{background:#047857}
+  .tbl th{background:#f1f5f9;font-weight:500;font-size:.78rem;color:#475569;text-align:left;padding:.6rem .7rem;white-space:nowrap}
+  .tbl td{padding:.6rem .7rem;font-size:.85rem;border-top:1px solid #f1f5f9;vertical-align:top}
+  .tbl tbody tr:hover{background:#f8fafc}
+  .badge{display:inline-block;padding:.12rem .55rem;border-radius:999px;font-size:.72rem;font-weight:500}
+  .navitem{display:flex;align-items:center;gap:.65rem;padding:.6rem .85rem;border-radius:.6rem;font-size:.87rem;color:#cbd5e1;cursor:pointer}
+  .navitem:hover{background:rgba(255,255,255,.1);color:#fff}
+  .navitem.active{background:#fff;color:#1a3f7a;font-weight:500}
+  @media print{body *{visibility:hidden}}
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+<!-- ========== LOADER ========== -->
+<div id="loader" class="hidden fixed inset-0 z-[9999] bg-white/75 backdrop-blur-sm flex items-center justify-center">
+  <div class="text-center">
+    <div class="w-14 h-14 mx-auto border-4 border-gov-200 border-t-gov-700 rounded-full animate-spin"></div>
+    <p id="loaderText" class="mt-3 text-gov-800 font-medium text-sm">กำลังโหลดข้อมูล...</p>
+  </div>
+</div>
+
+<!-- ========== TOAST ========== -->
+<div id="toastWrap" class="fixed top-3 right-3 left-3 sm:left-auto z-[9998] space-y-2 pointer-events-none"></div>
+
+<!-- ========================= LANDING PAGE ========================= -->
+<div id="pageLanding" class="min-h-screen">
+  <header class="bg-gradient-to-r from-gov-900 via-gov-800 to-gov-700 text-white">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-white/15 border border-white/25 flex items-center justify-center">
+          <i data-lucide="landmark" class="w-6 h-6"></i>
+        </div>
+        <div class="leading-tight">
+          <p class="font-semibold text-sm sm:text-base">ระบบอัจฉริยะการเงินและบัญชี</p>
+          <p class="text-[11px] sm:text-xs text-gov-200" id="landSchool">สถานศึกษาสังกัด สพฐ.</p>
+        </div>
+      </div>
+      <button onclick="gotoLogin()" class="btn bg-white text-gov-800 hover:bg-gov-50 text-xs sm:text-sm">
+        <i data-lucide="log-in" class="w-4 h-4"></i> เข้าสู่ระบบ
+      </button>
+    </div>
+  </header>
+
+  <section class="bg-gradient-to-b from-gov-700 to-gov-600 text-white">
+    <div class="max-w-7xl mx-auto px-4 pt-8 pb-14 text-center">
+      <span class="inline-flex items-center gap-1.5 bg-white/15 border border-white/25 rounded-full px-3 py-1 text-[11px] sm:text-xs mb-3">
+        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Smart Finance & Accounting System
+      </span>
+      <h1 class="text-2xl sm:text-4xl font-semibold leading-snug">บริหารงบประมาณ การเงิน บัญชี และพัสดุ<br class="hidden sm:block">ในระบบเดียว ถูกต้องตามระเบียบราชการ</h1>
+      <p class="mt-3 text-gov-100 text-sm sm:text-base max-w-2xl mx-auto">ควบคุมงบอัตโนมัติด้วย AI • แปลงเลขเป็นตัวอักษรไทย 100% • เอกสารราชการ 26 ประเภท • Audit Log พร้อมส่ง สตง.</p>
+      <div class="mt-6 flex flex-wrap gap-2 justify-center">
+        <button onclick="gotoLogin()" class="btn bg-white text-gov-800 hover:bg-gov-50"><i data-lucide="log-in" class="w-4 h-4"></i> เข้าสู่ระบบ</button>
+        <a href="#features" class="btn bg-white/15 border border-white/30 text-white hover:bg-white/25"><i data-lucide="list" class="w-4 h-4"></i> ดูความสามารถ</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Overview stats -->
+  <section class="max-w-7xl mx-auto px-4 -mt-9">
+    <div id="landStats" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+  </section>
+
+  <section class="max-w-7xl mx-auto px-4 mt-6 grid lg:grid-cols-3 gap-4">
+    <div class="card p-4 lg:col-span-2">
+      <h3 class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="bar-chart-3" class="w-4 h-4 text-gov-600"></i> การใช้งบประมาณรายโครงการ</h3>
+      <div class="h-64"><canvas id="landChart1"></canvas></div>
+    </div>
+    <div class="card p-4">
+      <h3 class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="pie-chart" class="w-4 h-4 text-gov-600"></i> สัดส่วนแหล่งเงินรับ</h3>
+      <div class="h-64"><canvas id="landChart2"></canvas></div>
+    </div>
+  </section>
+
+  <section id="features" class="max-w-7xl mx-auto px-4 py-10">
+    <h2 class="text-center text-lg sm:text-2xl font-semibold text-gov-900">ฟังก์ชันเด่นระดับอัจฉริยะ</h2>
+    <p class="text-center text-slate-500 text-sm mt-1 mb-6">ออกแบบตามระเบียบกระทรวงการคลังและ สพฐ.</p>
+    <div id="landFeatures" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+  </section>
+
+  <footer class="bg-gov-900 text-gov-200 text-xs text-center py-5 px-4">
+    <p>ระบบอัจฉริยะการเงินและบัญชีสถานศึกษา — พัฒนาด้วย Supabase + Tailwind CSS</p>
+    <p class="mt-1 text-gov-400">© <span id="fyNow"></span> สงวนสิทธิ์เพื่อการใช้งานภายในสถานศึกษา</p>
+  </footer>
+</div>
+
+<!-- ========================= LOGIN PAGE ========================= -->
+<div id="pageLogin" class="hidden min-h-screen bg-gradient-to-br from-gov-900 via-gov-700 to-gov-500 flex items-center justify-center p-4">
+  <div class="w-full max-w-md">
+    <button onclick="gotoLanding()" class="text-white/80 hover:text-white text-xs mb-3 inline-flex items-center gap-1">
+      <i data-lucide="arrow-left" class="w-4 h-4"></i> กลับหน้าแรก
+    </button>
+    <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 fade-in">
+      <div class="text-center mb-6">
+        <div class="w-16 h-16 mx-auto rounded-2xl bg-gov-700 flex items-center justify-center mb-3">
+          <i data-lucide="landmark" class="w-8 h-8 text-white"></i>
+        </div>
+        <h2 class="text-lg font-semibold text-gov-900">เข้าสู่ระบบ</h2>
+        <p class="text-xs text-slate-500 mt-1">ระบบอัจฉริยะการเงินและบัญชีสถานศึกษา</p>
+      </div>
+      <form id="loginForm" class="space-y-3">
+        <div>
+          <label class="text-xs font-medium text-slate-600">ชื่อผู้ใช้</label>
+          <div class="relative mt-1">
+            <i data-lucide="user" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+            <input id="liUser" class="inp pl-9" placeholder="username" autocomplete="username" required>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600">รหัสผ่าน</label>
+          <div class="relative mt-1">
+            <i data-lucide="lock" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+            <input id="liPass" type="password" class="inp pl-9 pr-9" placeholder="••••••" autocomplete="current-password" required>
+            <button type="button" onclick="togglePass()" class="absolute right-2 top-2.5 text-slate-400 hover:text-slate-600"><i data-lucide="eye" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+        <p id="loginErr" class="hidden text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></p>
+        <button type="submit" class="btn btn-p w-full justify-center"><i data-lucide="log-in" class="w-4 h-4"></i> เข้าสู่ระบบ</button>
+        <button type="button" onclick="openRecovery()" class="w-full text-xs text-gov-600 hover:underline pt-1">ลืมรหัสผ่าน? ใช้ Master Recovery Key</button>
+      </form>
+      <div class="mt-5 pt-4 border-t border-slate-100">
+        <p class="text-[11px] text-slate-400 mb-2">บัญชีทดสอบ (คลิกเพื่อกรอกอัตโนมัติ)</p>
+        <div id="demoAccts" class="grid grid-cols-2 gap-1.5"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================= APP ========================= -->
+<div id="app" class="hidden">
+  <!-- Sidebar (Desktop) -->
+  <aside id="sidebar" class="hidden md:flex md:flex-col fixed inset-y-0 left-0 w-64 bg-gov-900 z-40">
+    <div class="px-4 py-4 border-b border-white/10 flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center"><i data-lucide="landmark" class="w-5 h-5 text-white"></i></div>
+      <div class="leading-tight">
+        <p class="text-white text-[13px] font-medium">ระบบการเงิน-บัญชี</p>
+        <p class="text-gov-300 text-[10px]">Smart School Finance</p>
+      </div>
+    </div>
+    <nav id="sideMenu" class="flex-1 overflow-y-auto px-2.5 py-3 space-y-1"></nav>
+    <div class="p-2.5 border-t border-white/10">
+      <div class="flex items-center gap-2 px-2 py-2 mb-1.5">
+        <div id="sbAvatar" class="w-8 h-8 rounded-full bg-gov-500 text-white text-xs flex items-center justify-center font-medium"></div>
+        <div class="min-w-0">
+          <p id="sbName" class="text-white text-xs truncate"></p>
+          <p id="sbRole" class="text-gov-300 text-[10px] truncate"></p>
+        </div>
+      </div>
+      <button onclick="openLogout()" class="navitem w-full text-red-300 hover:bg-red-500/20"><i data-lucide="log-out" class="w-4 h-4"></i> ออกจากระบบ</button>
+    </div>
+  </aside>
+
+  <!-- Content -->
+  <div class="md:ml-64 min-h-screen flex flex-col">
+    <header class="sticky top-0 z-30 bg-white border-b border-slate-200">
+      <div class="px-3 sm:px-5 py-2.5 flex items-center gap-2">
+        <div class="flex-1 min-w-0">
+          <h1 id="pgTitle" class="text-sm sm:text-lg font-semibold text-gov-900 truncate">แดชบอร์ด</h1>
+          <p id="pgSub" class="text-[11px] text-slate-500 truncate">ภาพรวมระบบ</p>
+        </div>
+        <select id="fySelect" onchange="changeFY(this.value)" class="inp !w-auto !py-1.5 text-xs max-w-[140px]"></select>
+        <button onclick="openLogout()" class="md:hidden btn btn-g !px-2.5 !py-1.5"><i data-lucide="log-out" class="w-4 h-4"></i></button>
+      </div>
+    </header>
+    <main id="view" class="flex-1 p-3 sm:p-5 pb-28 md:pb-8"></main>
+  </div>
+
+  <!-- Bottom Nav (Mobile) -->
+  <nav id="bottomNav" class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 pb-[env(safe-area-inset-bottom)]">
+    <div id="bnItems" class="grid grid-cols-5"></div>
+  </nav>
+
+  <!-- Admin / More Panel (Mobile) -->
+  <div id="morePanel" class="hidden md:hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/50" onclick="toggleMore()"></div>
+    <div class="absolute bottom-0 inset-x-0 bg-white rounded-t-2xl slide-up max-h-[78vh] overflow-y-auto pb-24">
+      <div class="sticky top-0 bg-white flex items-center justify-between px-4 py-3 border-b border-slate-100">
+        <p class="font-medium text-sm text-gov-900">เมนูทั้งหมด</p>
+        <button onclick="toggleMore()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div id="moreGrid" class="p-3 grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MODALS ========== -->
+<div id="modal" class="hidden fixed inset-0 z-[9000] p-0 sm:p-4 flex items-end sm:items-center justify-center">
+  <div class="absolute inset-0 bg-black/50" onclick="closeModal()"></div>
+  <div class="relative bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[92vh] flex flex-col slide-up sm:animate-none">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+      <h3 id="modalTitle" class="font-medium text-gov-900 text-sm sm:text-base"></h3>
+      <button onclick="closeModal()" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+    <div id="modalBody" class="p-4 overflow-y-auto flex-1"></div>
+    <div id="modalFoot" class="px-4 py-3 border-t border-slate-100 flex gap-2 justify-end"></div>
+  </div>
+</div>
+
+<div id="confirmModal" class="hidden fixed inset-0 z-[9500] flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/50"></div>
+  <div class="relative bg-white rounded-2xl w-full max-w-sm p-5 text-center fade-in">
+    <div id="cfIcon" class="w-14 h-14 mx-auto rounded-full bg-red-50 flex items-center justify-center mb-3"><i data-lucide="alert-triangle" class="w-7 h-7 text-red-600"></i></div>
+    <h3 id="cfTitle" class="font-medium text-gov-900">ยืนยันการทำงาน</h3>
+    <p id="cfMsg" class="text-sm text-slate-500 mt-1.5"></p>
+    <div class="flex gap-2 mt-5">
+      <button onclick="cfResolve(false)" class="btn btn-g flex-1 justify-center">ยกเลิก</button>
+      <button id="cfOk" onclick="cfResolve(true)" class="btn btn-d flex-1 justify-center">ยืนยัน</button>
+    </div>
+  </div>
+</div>
+
+<div id="logoutModal" class="hidden fixed inset-0 z-[9500] flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/50" onclick="closeLogout()"></div>
+  <div class="relative bg-white rounded-2xl w-full max-w-sm p-5 text-center fade-in">
+    <div class="w-14 h-14 mx-auto rounded-full bg-amber-50 flex items-center justify-center mb-3"><i data-lucide="log-out" class="w-7 h-7 text-amber-600"></i></div>
+    <h3 class="font-medium text-gov-900">ออกจากระบบ</h3>
+    <p class="text-sm text-slate-500 mt-1.5">คุณต้องการออกจากระบบใช่หรือไม่?</p>
+    <div class="flex gap-2 mt-5">
+      <button onclick="closeLogout()" class="btn btn-g flex-1 justify-center">ยกเลิก</button>
+      <button onclick="doLogout()" class="btn btn-d flex-1 justify-center">ออกจากระบบ</button>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+/* ============================================================
+   CORE
+============================================================ */
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const BUCKET = (typeof STORAGE_BUCKET !== 'undefined') ? STORAGE_BUCKET : 'finance-files';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const state = { user:null, role:'guest', fy:null, fys:[], page:'dashboard', cache:{}, charts:{}, more:false };
+
+function icons(){ try{ lucide.createIcons(); }catch(e){} }
+function showLoader(t='กำลังโหลดข้อมูล...'){ $('loaderText').textContent=t; $('loader').classList.remove('hidden'); }
+function hideLoader(){ $('loader').classList.add('hidden'); }
+function toast(msg, type='success'){
+  const c = {success:['bg-emerald-600','check-circle'], error:['bg-red-600','x-circle'], warn:['bg-amber-500','alert-triangle'], info:['bg-gov-700','info']}[type]||['bg-gov-700','info'];
+  const d=document.createElement('div');
+  d.className=`${c[0]} text-white rounded-xl px-3.5 py-2.5 shadow-lg text-sm flex items-center gap-2 fade-in pointer-events-auto`;
+  d.innerHTML=`<i data-lucide="${c[1]}" class="w-4 h-4 shrink-0"></i><span>${esc(msg)}</span>`;
+  $('toastWrap').appendChild(d); icons();
+  setTimeout(()=>{ d.style.opacity='0'; d.style.transition='.3s'; setTimeout(()=>d.remove(),300); }, 3200);
+}
+let _cf=null;
+function confirmBox(msg, title='ยืนยันการทำงาน', danger=true){
+  $('cfTitle').textContent=title; $('cfMsg').textContent=msg;
+  $('cfOk').className = 'btn flex-1 justify-center ' + (danger?'btn-d':'btn-p');
+  $('confirmModal').classList.remove('hidden');
+  return new Promise(r=>{ _cf=r; });
+}
+function cfResolve(v){ $('confirmModal').classList.add('hidden'); if(_cf) _cf(v); _cf=null; }
+window.imgErr = function(img){
+  const d=document.createElement('div');
+  d.className = img.className + ' bg-slate-100 border border-dashed border-slate-300 text-slate-400 text-[10px] flex flex-col items-center justify-center text-center p-1';
+  d.innerHTML = '<span>⚠️</span><span>โหลดรูปไม่ได้</span>';
+  img.replaceWith(d);
+};
+const imgTag = (url, cls='w-12 h-12 rounded-lg object-cover', alt='') =>
+  url ? `<img src="${esc(url)}" alt="${esc(alt)}" class="${cls}" onerror="imgErr(this)">`
+      : `<div class="${cls} bg-slate-100 border border-dashed border-slate-300 text-slate-400 text-[10px] flex items-center justify-center">ไม่มีรูป</div>`;
+
+/* ---------- Formatters ---------- */
+const money = v => (Number(v)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const moneyS = v => (Number(v)||0).toLocaleString('th-TH',{maximumFractionDigits:0});
+const TH_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const TH_MF=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+function fmtDate(d){ if(!d) return '-'; const x=new Date(d); if(isNaN(x)) return d; return `${x.getDate()} ${TH_M[x.getMonth()]} ${x.getFullYear()+543}`; }
+function fmtDateFull(d){ if(!d) return '-'; const x=new Date(d); return `${x.getDate()} ${TH_MF[x.getMonth()]} พ.ศ. ${x.getFullYear()+543}`; }
+/* ปีงบประมาณไทย ต.ค.-ก.ย. */
+function thaiFiscalYear(d=new Date()){ const x=new Date(d); const y=x.getFullYear()+543; return x.getMonth()>=9 ? y+1 : y; }
+
+/* ---------- แปลงเลขเป็นตัวอักษรไทย (ราชบัณฑิตยสภา) ---------- */
+const THD=['ศูนย์','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'];
+const THP=['','สิบ','ร้อย','พัน','หมื่น','แสน'];
+function readInt(n){
+  n = Math.floor(Math.abs(n));
+  if(n===0) return 'ศูนย์';
+  let s=String(n);
+  if(s.length>6){
+    const head=s.slice(0,s.length-6), tail=s.slice(-6);
+    return readInt(Number(head))+'ล้าน'+(Number(tail)? readInt(Number(tail)) : '');
+  }
+  let r='', len=s.length;
+  for(let i=0;i<len;i++){
+    const dg=+s[i], pos=len-i-1;
+    if(dg===0) continue;
+    if(pos===1) r += (dg===1?'':dg===2?'ยี่':THD[dg])+'สิบ';
+    else if(pos===0) r += (dg===1 && len>1) ? 'เอ็ด' : THD[dg];
+    else r += THD[dg]+THP[pos];
+  }
+  return r;
+}
+function bahtText(v){
+  const num = Number(v)||0;
+  const neg = num<0 ? 'ลบ' : '';
+  const t = Math.round(Math.abs(num)*100);
+  const baht = Math.floor(t/100), st = t%100;
+  if(baht===0 && st===0) return 'ศูนย์บาทถ้วน';
+  let out = (baht>0 ? readInt(baht) : 'ศูนย์') + 'บาท';
+  out += st>0 ? readInt(st)+'สตางค์' : 'ถ้วน';
+  return neg+out;
+}
+
+/* ---------- DB helpers ---------- */
+async function dbGet(table, opt={}){
+  let q = sbClient.from(table).select(opt.select||'*');
+  if(opt.eq) for(const [k,v] of Object.entries(opt.eq)) if(v!==undefined&&v!==null) q=q.eq(k,v);
+  if(opt.order) q=q.order(opt.order,{ascending:opt.asc!==false});
+  if(opt.limit) q=q.limit(opt.limit);
+  const {data,error}=await q; if(error) throw error; return data||[];
+}
+async function dbInsert(t,row){ const {data,error}=await sbClient.from(t).insert(row).select(); if(error) throw error; return data; }
+async function dbUpdate(t,pk,id,row){ const {data,error}=await sbClient.from(t).update(row).eq(pk,id).select(); if(error) throw error; return data; }
+async function dbDelete(t,pk,id){ const {error}=await sbClient.from(t).delete().eq(pk,id); if(error) throw error; }
+async function dbCount(t){ const {count,error}=await sbClient.from(t).select('*',{count:'exact',head:true}); if(error) return 0; return count||0; }
+async function logAudit(action, table, recId, detail){
+  try{ await sbClient.from('audit_logs').insert({user_id:state.user?.user_id, username:state.user?.username, action, table_name:table, record_id:String(recId??''), detail}); }catch(e){}
+}
+
+/* ---------- Upload + บีบอัดภาพ ---------- */
+function compressImage(file, maxW=1100, quality=0.72){
+  return new Promise((res,rej)=>{
+    if(!file.type.startsWith('image/')) return res(file);
+    const fr=new FileReader();
+    fr.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        let {width:w,height:h}=img;
+        if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; }
+        const c=document.createElement('canvas'); c.width=w; c.height=h;
+        const ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h);
+        c.toBlob(b=>{ if(!b) return rej(new Error('บีบอัดภาพไม่สำเร็จ'));
+          res(new File([b], file.name.replace(/\.\w+$/,'')+'.webp', {type:'image/webp'})); }, 'image/webp', quality);
+      };
+      img.onerror=()=>rej(new Error('ไฟล์ภาพเสียหาย'));
+      img.src=e.target.result;
+    };
+    fr.onerror=()=>rej(new Error('อ่านไฟล์ไม่สำเร็จ'));
+    fr.readAsDataURL(file);
+  });
+}
+async function uploadFile(file, folder='general'){
+  const f = file.type.startsWith('image/') ? await compressImage(file) : file;
+  if(f.size > 10*1024*1024) throw new Error('ไฟล์ใหญ่เกิน 10 MB');
+  const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${f.name.replace(/[^\w.\-]/g,'_')}`;
+  const {error}=await sbClient.storage.from(BUCKET).upload(path,f,{upsert:true,contentType:f.type});
+  if(error) throw error;
+  return sbClient.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+/* ============================================================
+   RESOURCE REGISTRY  (โครงสร้าง CRUD ทั้งระบบ)
+   ฟิลด์: [key, label, type, extra]
+   type: text|textarea|number|money|date|select|ref|bool|image|file|pass
+============================================================ */
+const MODULES = {
+  income:   {n:'บริหารเงินนอก-ใน-บริจาค', i:'wallet',        roles:['admin','director','finance'], view:['deputy','accounting']},
+  account:  {n:'บริหารบัญชี',              i:'calculator',    roles:['admin','director','accounting'], view:['deputy','finance']},
+  procure:  {n:'พัสดุและจัดซื้อจัดจ้าง',    i:'package',       roles:['admin','director','supply'], view:['deputy']},
+  budget:   {n:'บริหารงบประมาณ',            i:'pie-chart',     roles:['admin','director','planning'], view:['deputy','finance','accounting']},
+  master:   {n:'ข้อมูลพื้นฐาน',             i:'database',      roles:['admin','director'], view:['deputy','finance','accounting','supply','planning']},
+  admin:    {n:'ผู้ดูแลระบบ',               i:'shield',        roles:['admin'], view:[]}
+};
+
+const RES = {
+  /* ---------- INCOME ---------- */
+  incomes:{m:'income',t:'รับเงินอุดหนุน สพฐ./อปท./บริจาค',tb:'incomes',pk:'income_id',i:'hand-coins',fy:true,by:'recorded_by',
+    f:[['income_source','แหล่งเงิน','select',['สพฐ.','อปท.','เงินบริจาค','เงินรายได้สถานศึกษา','อื่นๆ']],
+       ['income_type','ประเภทเงิน','select',['เงินอุดหนุนรายหัว','เงินอุดหนุนปัจจัยพื้นฐาน','เงินเรียนฟรี 15 ปี','เงินอุดหนุน อปท.','เงินบริจาค','ค่าบำรุงห้องเรียนพิเศษ','อื่นๆ']],
+       ['amount','จำนวนเงิน (บาท)','money'],['received_date','วันที่รับเงิน','date'],
+       ['ref_no','เลขที่อ้างอิง','text'],['description','รายละเอียด','textarea']],
+    c:[['received_date','วันที่','date'],['income_source','แหล่งเงิน'],['income_type','ประเภท'],['ref_no','อ้างอิง'],['amount','จำนวนเงิน','money']]},
+  receipts:{m:'income',t:'ใบเสร็จรับเงิน',tb:'receipts',pk:'receipt_id',i:'receipt',by:'issued_by',doc:'receipt',
+    f:[['receipt_no','เลขที่ใบเสร็จ','text'],['book_no','เล่มที่','text'],
+       ['income_id','อ้างอิงรายการรับเงิน','ref',{tb:'incomes',pk:'income_id',lb:r=>`${r.ref_no||''} ${r.income_type||''} (${money(r.amount)})`}],
+       ['payer_name','ชื่อผู้ชำระเงิน','text'],['payer_address','ที่อยู่ผู้ชำระ','textarea'],
+       ['purpose','รายการ/วัตถุประสงค์','textarea'],['total_amount','จำนวนเงินรวม','money'],
+       ['issued_date','วันที่ออกใบเสร็จ','date'],['payment_method','วิธีชำระ','select',['เงินสด','โอนเงิน','เช็ค','บัตรเครดิต']],
+       ['cancel_status','ยกเลิกใบเสร็จ','bool'],['cancel_reason','เหตุผลการยกเลิก','text'],
+       ['attachment_url','ไฟล์แนบ/สลิป','image']],
+    c:[['receipt_no','เลขที่'],['issued_date','วันที่','date'],['payer_name','ผู้ชำระเงิน'],['total_amount','จำนวนเงิน','money'],['cancel_status','สถานะ','cancel']]},
+  bank_deposits:{m:'income',t:'นำเงินฝากธนาคาร',tb:'bank_deposits',pk:'deposit_id',i:'landmark',by:'recorded_by',
+    f:[['receipt_id','ใบเสร็จอ้างอิง','ref',{tb:'receipts',pk:'receipt_id',lb:r=>`${r.receipt_no} - ${r.payer_name}`}],
+       ['bank_account_id','บัญชีธนาคาร','ref',{tb:'bank_accounts',pk:'bank_account_id',lb:r=>`${r.account_name} (${r.account_no})`}],
+       ['bank_account_no','เลขที่บัญชี','text'],['deposit_date','วันที่นำฝาก','date'],
+       ['amount','จำนวนเงิน','money'],['deposit_slip_ref','เลขที่ใบนำฝาก','text'],['slip_url','ภาพสลิป','image']],
+    c:[['deposit_date','วันที่','date'],['bank_account_no','เลขบัญชี'],['deposit_slip_ref','เลขที่สลิป'],['amount','จำนวนเงิน','money'],['slip_url','สลิป','img']]},
+  cash_book_logs:{m:'income',t:'สมุดเงินสด',tb:'cash_book_logs',pk:'cash_log_id',i:'book-open',fy:true,by:'recorded_by',
+    f:[['transaction_date','วันที่','date'],['type','ประเภท','select',['IN','OUT']],
+       ['amount','จำนวนเงิน','money'],['balance_after','ยอดคงเหลือ','money'],
+       ['ref_document_type','ประเภทเอกสารอ้างอิง','select',['receipt','disbursement','other']],
+       ['ref_document_id','เลขที่เอกสารอ้างอิง','number'],['description','คำอธิบายรายการ','textarea']],
+    c:[['transaction_date','วันที่','date'],['description','รายการ'],['type','ประเภท','inout'],['amount','จำนวนเงิน','money'],['balance_after','คงเหลือ','money']]},
+  bank_reconciliations:{m:'income',t:'กระทบยอดธนาคาร',tb:'bank_reconciliations',pk:'recon_id',i:'scale',
+    f:[['bank_account_id','บัญชีธนาคาร','ref',{tb:'bank_accounts',pk:'bank_account_id',lb:r=>`${r.account_name} (${r.account_no})`}],
+       ['period','งวด (ปี-เดือน)','text'],['statement_balance','ยอดตาม Statement','money'],
+       ['book_balance','ยอดตามบัญชี','money'],['status','สถานะ','select',['pending','balanced','diff']],
+       ['note','หมายเหตุ','textarea'],['reconciled_by','ผู้กระทบยอด','text']],
+    c:[['period','งวด'],['statement_balance','ยอดธนาคาร','money'],['book_balance','ยอดบัญชี','money'],['difference','ผลต่าง','money'],['status','สถานะ','status']]},
+  monthly_income_report:{m:'income',t:'รายงานรับเงินประจำเดือน',tb:'monthly_expense_reports',pk:'report_id',i:'file-bar-chart',fy:true,by:'created_by',
+    f:[['month_period','งวดเดือน (เช่น 2569-01)','text'],['total_received','รวมรับเงิน','money'],
+       ['total_paid','รวมจ่ายเงิน','money'],['status','สถานะ','select',['draft','submitted','approved']]],
+    c:[['month_period','งวด'],['total_received','รับเงิน','money'],['total_paid','จ่ายเงิน','money'],['status','สถานะ','status']]},
+
+  /* ---------- ACCOUNTING ---------- */
+  disbursements:{m:'account',t:'ตรวจเอกสารขอเบิก / ใบสำคัญจ่าย',tb:'disbursements',pk:'disbursement_id',i:'file-check',fy:true,by:'created_by',doc:'voucher',budget:'allocation_id',
+    f:[['voucher_no','เลขที่ใบสำคัญจ่าย','text'],
+       ['doc_type','ประเภทเอกสาร','select',['ใบสำคัญจ่าย','ใบเบิกค่าเดินทาง','สัญญายืมเงิน','ใบรับรองแทนใบเสร็จ','อื่นๆ']],
+       ['allocation_id','โครงการ/งบประมาณ','ref',{tb:'budget_allocations',pk:'allocation_id',lb:r=>`${r.project_code} ${r.project_name} (คงเหลือ ${money(r.remaining_amount)})`}],
+       ['payee_name','ชื่อผู้รับเงิน','text'],['description','รายละเอียดการจ่าย','textarea'],
+       ['total_amount','จำนวนเงินรวม','money'],['request_date','วันที่ขอเบิก','date'],['pay_date','วันที่จ่าย','date'],
+       ['payment_method','วิธีการจ่าย','select',['โอนเงิน','เงินสด','เช็ค']],
+       ['approval_status','สถานะอนุมัติ','select',['pending','approved','rejected','paid']],
+       ['approved_by','ผู้อนุมัติ','text'],['attachment_url','เอกสารแนบ','image']],
+    c:[['voucher_no','เลขที่'],['request_date','วันที่','date'],['payee_name','ผู้รับเงิน'],['total_amount','จำนวนเงิน','money'],['approval_status','สถานะ','status']]},
+  form_8708_travel:{m:'account',t:'แบบ 8708 (ค่าเดินทางไปราชการ)',tb:'form_8708_travel',pk:'form_8708_id',i:'plane',by:'user_id',doc:'f8708',teacher:true,
+    f:[['traveler_name','ชื่อผู้เดินทาง','text'],['position','ตำแหน่ง','text'],
+       ['destination','สถานที่ไปราชการ','text'],['purpose','วัตถุประสงค์','textarea'],
+       ['travel_date','วันที่เริ่มเดินทาง','date'],['end_date','วันที่กลับ','date'],
+       ['allowance_amount','ค่าเบี้ยเลี้ยง','money'],['transport_amount','ค่าพาหนะ','money'],
+       ['accommodation_amount','ค่าเช่าที่พัก','money'],['other_amount','ค่าใช้จ่ายอื่น','money'],
+       ['disbursement_id','อ้างอิงใบสำคัญจ่าย','ref',{tb:'disbursements',pk:'disbursement_id',lb:r=>`${r.voucher_no} - ${r.payee_name}`}],
+       ['status','สถานะ','select',['draft','submitted','approved','rejected']]],
+    c:[['traveler_name','ผู้เดินทาง'],['destination','สถานที่'],['travel_date','วันที่','date'],['total_amount','รวมเงิน','money'],['status','สถานะ','status']]},
+  form_8500_loans:{m:'account',t:'แบบ 8500 (สัญญายืมเงิน)',tb:'form_8500_loans',pk:'loan_id',i:'file-signature',by:'borrower_id',doc:'f8500',teacher:true,
+    f:[['contract_no','เลขที่สัญญา','text'],
+       ['borrower_id','ผู้ยืม','ref',{tb:'users',pk:'user_id',lb:r=>r.fullname}],
+       ['purpose','วัตถุประสงค์การยืม','textarea'],['amount_borrowed','จำนวนเงินยืม','money'],
+       ['borrow_date','วันที่ยืม','date'],['due_date','กำหนดส่งใช้','date'],
+       ['cleared_status','สถานะส่งใช้','select',['pending','partial','cleared']],
+       ['cleared_amount','จำนวนที่ส่งใช้แล้ว','money'],['cleared_date','วันที่ส่งใช้','date'],
+       ['disbursement_id','อ้างอิงใบสำคัญจ่าย','ref',{tb:'disbursements',pk:'disbursement_id',lb:r=>`${r.voucher_no} - ${r.payee_name}`}]],
+    c:[['contract_no','เลขที่สัญญา'],['borrow_date','วันที่ยืม','date'],['due_date','ครบกำหนด','date'],['amount_borrowed','ยอดยืม','money'],['remaining_amount','คงค้าง','money'],['cleared_status','สถานะ','status']]},
+  form_bk111:{m:'account',t:'บก.111 (ใบรับรองแทนใบเสร็จ)',tb:'form_bk111',pk:'bk111_id',i:'file-text',doc:'bk111',
+    f:[['vendor_name','ชื่อร้านค้า/ผู้รับเงิน','text'],['item_description','รายการ','textarea'],
+       ['quantity','จำนวน','number'],['unit_price','ราคาต่อหน่วย','money'],['amount','จำนวนเงินรวม','money'],
+       ['expense_date','วันที่จ่าย','date'],['reason','เหตุผลที่ไม่มีใบเสร็จ','textarea'],
+       ['certified_by','ผู้รับรอง','text'],
+       ['disbursement_id','อ้างอิงใบสำคัญจ่าย','ref',{tb:'disbursements',pk:'disbursement_id',lb:r=>`${r.voucher_no} - ${r.payee_name}`}]],
+    c:[['expense_date','วันที่','date'],['vendor_name','ร้านค้า'],['item_description','รายการ'],['amount','จำนวนเงิน','money'],['certified_by','ผู้รับรอง']]},
+  monthly_expense_reports:{m:'account',t:'รายงานจ่ายเงินประจำเดือน',tb:'monthly_expense_reports',pk:'report_id',i:'clipboard-list',fy:true,by:'created_by',
+    f:[['month_period','งวดเดือน','text'],['total_received','รวมรับเงิน','money'],['total_paid','รวมจ่ายเงิน','money'],
+       ['status','สถานะ','select',['draft','submitted','approved']]],
+    c:[['month_period','งวด'],['total_received','รับเงิน','money'],['total_paid','จ่ายเงิน','money'],['status','สถานะ','status']]},
+
+  /* ---------- PROCUREMENT ---------- */
+  procurement_plans:{m:'procure',t:'แผนจัดซื้อจัดจ้างประจำปี',tb:'procurement_plans',pk:'plan_id',i:'calendar-range',fy:true,
+    f:[['plan_name','ชื่อรายการตามแผน','text'],['category','ประเภท','select',['วัสดุ','ครุภัณฑ์','สิ่งก่อสร้าง','จ้างบริการ']],
+       ['estimated_budget','วงเงินประมาณการ','money'],['planned_quarter','ไตรมาส','select',['ไตรมาส 1','ไตรมาส 2','ไตรมาส 3','ไตรมาส 4']],
+       ['method','วิธีจัดหา','select',['เฉพาะเจาะจง','สอบราคา','e-bidding','คัดเลือก']],
+       ['status','สถานะ','select',['planned','in_progress','completed','cancelled']]],
+    c:[['plan_name','รายการ'],['category','ประเภท'],['planned_quarter','ไตรมาส'],['estimated_budget','วงเงิน','money'],['status','สถานะ','status']]},
+  purchase_requests:{m:'procure',t:'ใบขอซื้อ/ขอจ้าง (PR)',tb:'purchase_requests',pk:'pr_id',i:'shopping-cart',by:'requester_id',doc:'pr',teacher:true,
+    f:[['pr_no','เลขที่ใบขอซื้อ','text'],['pr_date','วันที่','date'],
+       ['plan_id','อ้างอิงแผนจัดซื้อ','ref',{tb:'procurement_plans',pk:'plan_id',lb:r=>r.plan_name}],
+       ['purpose','เหตุผล/ความจำเป็น','textarea'],['total_estimated_price','ราคาประมาณการรวม','money'],
+       ['status','สถานะ','select',['pending','approved','rejected']],['approved_by','ผู้อนุมัติ','text']],
+    c:[['pr_no','เลขที่'],['pr_date','วันที่','date'],['purpose','เหตุผล'],['total_estimated_price','วงเงิน','money'],['status','สถานะ','status']]},
+  quotations:{m:'procure',t:'หาผู้ขาย / เสนอราคา',tb:'quotations',pk:'quotation_id',i:'gavel',
+    f:[['pr_id','ใบขอซื้ออ้างอิง','ref',{tb:'purchase_requests',pk:'pr_id',lb:r=>`${r.pr_no} - ${r.purpose||''}`}],
+       ['vendor_id','ผู้ขาย','ref',{tb:'vendors',pk:'vendor_id',lb:r=>r.company_name}],
+       ['offered_price','ราคาที่เสนอ','money'],['submission_date','วันที่ยื่นเสนอ','date'],
+       ['validity_days','ยืนราคา (วัน)','number'],['is_winner','เป็นผู้ชนะ','bool'],['note','หมายเหตุ','textarea']],
+    c:[['submission_date','วันที่','date'],['offered_price','ราคาเสนอ','money'],['is_winner','ผลการพิจารณา','winner'],['note','หมายเหตุ']]},
+  purchase_orders:{m:'procure',t:'ใบสั่งซื้อ/สั่งจ้าง/สัญญา (PO)',tb:'purchase_orders',pk:'po_id',i:'file-input',doc:'po',
+    f:[['po_no','เลขที่ใบสั่งซื้อ','text'],['contract_no','เลขที่สัญญา','text'],['po_date','วันที่','date'],
+       ['pr_id','ใบขอซื้ออ้างอิง','ref',{tb:'purchase_requests',pk:'pr_id',lb:r=>r.pr_no}],
+       ['vendor_id','ผู้ขาย/ผู้รับจ้าง','ref',{tb:'vendors',pk:'vendor_id',lb:r=>r.company_name}],
+       ['total_amount','มูลค่าตามสัญญา','money'],['delivery_due_date','กำหนดส่งมอบ','date'],
+       ['status','สถานะ','select',['open','delivered','closed','cancelled']],['file_url','ไฟล์สัญญา','image']],
+    c:[['po_no','เลขที่ PO'],['po_date','วันที่','date'],['contract_no','เลขที่สัญญา'],['total_amount','มูลค่า','money'],['status','สถานะ','status']]},
+  asset_inspections:{m:'procure',t:'ตรวจรับพัสดุ/ครุภัณฑ์',tb:'asset_inspections',pk:'inspection_id',i:'clipboard-check',by:'inspector_id',doc:'inspect',
+    f:[['po_id','ใบสั่งซื้ออ้างอิง','ref',{tb:'purchase_orders',pk:'po_id',lb:r=>`${r.po_no} (${money(r.total_amount)})`}],
+       ['inspection_date','วันที่ตรวจรับ','date'],['is_passed','ผลการตรวจรับ (ผ่าน)','bool'],
+       ['defect_notes','ข้อสังเกต/ข้อบกพร่อง','textarea'],['photo_url','ภาพการตรวจรับ','image']],
+    c:[['inspection_date','วันที่','date'],['is_passed','ผล','pass'],['defect_notes','ข้อสังเกต'],['photo_url','ภาพ','img']]},
+  assets:{m:'procure',t:'ทะเบียนคุมทรัพย์สิน/ครุภัณฑ์',tb:'assets',pk:'asset_id',i:'boxes',doc:'asset',
+    f:[['asset_code','รหัสครุภัณฑ์','text'],['asset_name','ชื่อครุภัณฑ์','text'],
+       ['category','ประเภท','select',['ครุภัณฑ์สำนักงาน','ครุภัณฑ์คอมพิวเตอร์','ครุภัณฑ์การศึกษา','ครุภัณฑ์งานบ้านงานครัว','ครุภัณฑ์โฆษณาและเผยแพร่','ครุภัณฑ์ยานพาหนะ','อื่นๆ']],
+       ['brand_model','ยี่ห้อ/รุ่น','text'],['serial_no','หมายเลขเครื่อง','text'],
+       ['received_date','วันที่รับ','date'],['unit_price','ราคาต่อหน่วย','money'],['quantity','จำนวน','number'],
+       ['useful_life_years','อายุการใช้งาน (ปี)','number'],
+       ['department_id','หน่วยงานที่ครอบครอง','ref',{tb:'departments',pk:'department_id',lb:r=>r.dept_name}],
+       ['po_id','อ้างอิงใบสั่งซื้อ','ref',{tb:'purchase_orders',pk:'po_id',lb:r=>r.po_no}],
+       ['location','สถานที่ตั้ง','text'],
+       ['status','สถานะ','select',['ใช้งานปกติ','ชำรุด','รอจำหน่าย','จำหน่ายแล้ว','สูญหาย']],
+       ['image_url','ภาพครุภัณฑ์','image']],
+    c:[['image_url','ภาพ','img'],['asset_code','รหัส'],['asset_name','ชื่อครุภัณฑ์'],['location','สถานที่'],['unit_price','ราคา','money'],['status','สถานะ','status']]},
+  asset_disposals:{m:'procure',t:'จำหน่ายครุภัณฑ์หมดอายุ',tb:'asset_disposals',pk:'disposal_id',i:'trash-2',doc:'disposal',
+    f:[['asset_id','ครุภัณฑ์','ref',{tb:'assets',pk:'asset_id',lb:r=>`${r.asset_code} - ${r.asset_name}`}],
+       ['disposal_date','วันที่จำหน่าย','date'],['disposal_reason','เหตุผลการจำหน่าย','textarea'],
+       ['method','วิธีการจำหน่าย','select',['ขาย','บริจาค','แลกเปลี่ยน','ทำลาย']],
+       ['sale_amount','เงินที่ได้รับ','money'],['approval_no','เลขที่หนังสืออนุมัติ','text'],
+       ['approved_by','ผู้อนุมัติ','text'],['document_url','เอกสารแนบ','image']],
+    c:[['disposal_date','วันที่','date'],['method','วิธีการ'],['disposal_reason','เหตุผล'],['sale_amount','เงินที่ได้','money'],['approval_no','เลขที่อนุมัติ']]},
+
+  /* ---------- BUDGET ---------- */
+  budget_requests:{m:'budget',t:'คำของบประมาณประจำปี',tb:'budget_requests',pk:'req_id',i:'file-plus',fy:true,by:'user_id',doc:'budreq',teacher:true,
+    f:[['project_code','รหัสโครงการ','text'],['project_name','ชื่อโครงการ','text'],
+       ['strategy','กลยุทธ์/แผนงาน','text'],['requested_amount','งบประมาณที่ขอ','money'],
+       ['approved_amount','งบที่อนุมัติ','money'],['justification','เหตุผลความจำเป็น','textarea'],
+       ['request_date','วันที่เสนอ','date'],['approval_status','สถานะ','select',['pending','approved','rejected']]],
+    c:[['project_code','รหัส'],['project_name','ชื่อโครงการ'],['requested_amount','ขอ','money'],['approved_amount','อนุมัติ','money'],['approval_status','สถานะ','status']]},
+  budget_allocations:{m:'budget',t:'จัดสรรงบตามแผนงาน/โครงการ',tb:'budget_allocations',pk:'allocation_id',i:'coins',fy:true,
+    f:[['project_code','รหัสโครงการ','text'],['project_name','ชื่อโครงการ','text'],
+       ['budget_type','ประเภทงบ','select',['งบดำเนินงาน','งบลงทุน','งบอุดหนุน','งบอุดหนุน อปท.','เงินรายได้สถานศึกษา','เงินบริจาค']],
+       ['responsible_person','ผู้รับผิดชอบ','text'],['allocated_amount','งบที่ได้รับจัดสรร','money'],
+       ['used_amount','ใช้ไปแล้ว','money'],['status','สถานะ','select',['active','closed']]],
+    c:[['project_code','รหัส'],['project_name','โครงการ'],['allocated_amount','จัดสรร','money'],['used_amount','ใช้ไป','money'],['remaining_amount','คงเหลือ','money'],['_pct','% ใช้','pct']]},
+  budget_transfers:{m:'budget',t:'โอนเปลี่ยนแปลงงบประมาณ',tb:'budget_transfers',pk:'transfer_id',i:'arrow-left-right',doc:'transfer',teacher:true,
+    f:[['from_allocation_id','โอนจากโครงการ','ref',{tb:'budget_allocations',pk:'allocation_id',lb:r=>`${r.project_code} ${r.project_name} (คงเหลือ ${money(r.remaining_amount)})`}],
+       ['to_allocation_id','โอนไปโครงการ','ref',{tb:'budget_allocations',pk:'allocation_id',lb:r=>`${r.project_code} ${r.project_name}`}],
+       ['transfer_amount','จำนวนเงินที่โอน','money'],['transfer_date','วันที่โอน','date'],
+       ['reason','เหตุผล','textarea'],['approved_by','ผู้อนุมัติ','text'],
+       ['status','สถานะ','select',['pending','approved','rejected']]],
+    c:[['transfer_date','วันที่','date'],['transfer_amount','จำนวนเงิน','money'],['reason','เหตุผล'],['status','สถานะ','status']]},
+  budget_reports_area:{m:'budget',t:'รายงานใช้งบต่อ สพป./สพม.',tb:'budget_reports_area',pk:'area_report_id',i:'send',fy:true,doc:'areareport',
+    f:[['report_period','งวดรายงาน','text'],['disbursed_total','เบิกจ่ายสะสม','money'],
+       ['committed_total','ผูกพันงบประมาณ','money'],['remaining_total','คงเหลือ','money'],
+       ['submitted_to','ส่งถึง','select',['สพป.ตัวอย่าง','สพม.ตัวอย่าง','สพฐ.']],
+       ['submission_date','วันที่ส่ง','date'],['status','สถานะ','select',['draft','submitted','approved']],
+       ['file_url','ไฟล์รายงาน','image']],
+    c:[['report_period','งวด'],['disbursed_total','เบิกจ่าย','money'],['committed_total','ผูกพัน','money'],['submission_date','วันที่ส่ง','date'],['status','สถานะ','status']]},
+
+  /* ---------- MASTER ---------- */
+  vendors:{m:'master',t:'ทะเบียนผู้ขาย/ผู้รับจ้าง',tb:'vendors',pk:'vendor_id',i:'store',
+    f:[['company_name','ชื่อบริษัท/ร้านค้า','text'],['tax_id','เลขประจำตัวผู้เสียภาษี','text'],
+       ['contact_name','ผู้ติดต่อ','text'],['phone','โทรศัพท์','text'],['email','อีเมล','text'],
+       ['address','ที่อยู่','textarea'],['bank_name','ธนาคาร','text'],['bank_account_no','เลขที่บัญชี','text'],
+       ['status','สถานะ','select',['active','inactive']]],
+    c:[['company_name','ชื่อผู้ขาย'],['tax_id','เลขผู้เสียภาษี'],['phone','โทรศัพท์'],['bank_account_no','บัญชีธนาคาร'],['status','สถานะ','status']]},
+  bank_accounts:{m:'master',t:'บัญชีธนาคาร (12 บัญชี)',tb:'bank_accounts',pk:'bank_account_id',i:'credit-card',
+    f:[['account_name','ชื่อบัญชี','text'],['bank_name','ธนาคาร','text'],['branch','สาขา','text'],
+       ['account_no','เลขที่บัญชี','text'],['account_type','ประเภทบัญชี','select',['ออมทรัพย์','กระแสรายวัน','ฝากประจำ']],
+       ['money_type','ประเภทเงิน','select',['เงินงบประมาณ','เงินนอกงบประมาณ','เงินบริจาค','เงินอุดหนุน อปท.','เงินรายได้สถานศึกษา','เงินฝากคลัง']],
+       ['opening_balance','ยอดยกมา','money'],['current_balance','ยอดคงเหลือปัจจุบัน','money'],['is_active','ใช้งาน','bool']],
+    c:[['account_name','ชื่อบัญชี'],['bank_name','ธนาคาร'],['account_no','เลขบัญชี'],['money_type','ประเภทเงิน'],['current_balance','ยอดคงเหลือ','money']]},
+  special_classrooms:{m:'master',t:'ห้องเรียนพิเศษ 7 ประเภท',tb:'special_classrooms',pk:'classroom_id',i:'graduation-cap',
+    f:[['program_code','รหัสหลักสูตร','text'],['program_name','ชื่อหลักสูตร','text'],['level','ระดับชั้น','text'],
+       ['fee_rate','อัตราค่าบำรุง (บาท/คน/ภาคเรียน)','money'],['student_count','จำนวนนักเรียน','number'],
+       ['description','รายละเอียด','textarea'],['is_active','เปิดสอน','bool']],
+    c:[['program_code','รหัส'],['program_name','หลักสูตร'],['level','ระดับ'],['fee_rate','อัตรา','money'],['student_count','นักเรียน'],['_rev','รายรับรวม','revenue']]},
+  fiscal_years:{m:'master',t:'ปีงบประมาณ',tb:'fiscal_years',pk:'fiscal_year_id',i:'calendar',
+    f:[['year_title','ชื่อปีงบประมาณ','text'],['start_date','วันเริ่มต้น (1 ต.ค.)','date'],
+       ['end_date','วันสิ้นสุด (30 ก.ย.)','date'],['is_active','ปีปัจจุบัน','bool'],['note','หมายเหตุ','text']],
+    c:[['year_title','ปีงบประมาณ'],['start_date','เริ่ม','date'],['end_date','สิ้นสุด','date'],['is_active','ใช้งาน','bool']]},
+  departments:{m:'master',t:'กลุ่มงาน/หน่วยงาน',tb:'departments',pk:'department_id',i:'building-2',
+    f:[['dept_name','ชื่อกลุ่มงาน','text'],['dept_head','หัวหน้ากลุ่มงาน','text'],['building','อาคาร/สถานที่','text']],
+    c:[['dept_name','กลุ่มงาน'],['dept_head','หัวหน้า'],['building','อาคาร']]},
+
+  /* ---------- ADMIN ---------- */
+  users:{m:'admin',t:'จัดการผู้ใช้งาน',tb:'users',pk:'user_id',i:'users',
+    f:[['username','ชื่อผู้ใช้','text'],['password_hash','รหัสผ่าน','pass'],['fullname','ชื่อ-สกุล','text'],
+       ['position','ตำแหน่ง','text'],
+       ['role_id','สิทธิ์การใช้งาน','ref',{tb:'roles',pk:'role_id',lb:r=>r.role_name}],
+       ['email','อีเมล','text'],['phone','โทรศัพท์','text'],
+       ['avatar_url','รูปโปรไฟล์','image'],['signature_url','ลายเซ็นอิเล็กทรอนิกส์','image'],
+       ['status','สถานะ','select',['active','inactive']]],
+    c:[['avatar_url','รูป','img'],['username','ชื่อผู้ใช้'],['fullname','ชื่อ-สกุล'],['position','ตำแหน่ง'],['status','สถานะ','status']]},
+  roles:{m:'admin',t:'สิทธิ์และบทบาท',tb:'roles',pk:'role_id',i:'shield-check',
+    f:[['role_code','รหัสสิทธิ์','text'],['role_name','ชื่อบทบาท','text'],['description','คำอธิบาย','textarea']],
+    c:[['role_code','รหัส'],['role_name','บทบาท'],['description','คำอธิบาย']]},
+  audit_logs:{m:'admin',t:'Audit Log (พร้อมส่ง สตง.)',tb:'audit_logs',pk:'log_id',i:'history',ro:true,
+    f:[],c:[['created_at','เวลา','datetime'],['username','ผู้ใช้'],['action','การกระทำ','action'],['table_name','ตาราง'],['detail','รายละเอียด']]},
+  system_settings:{m:'admin',t:'ตั้งค่าระบบ / Recovery Key',tb:'system_settings',pk:'setting_id',i:'settings',
+    f:[['setting_key','คีย์','text'],['setting_value','ค่า','text'],['description','คำอธิบาย','text']],
+    c:[['setting_key','คีย์'],['setting_value','ค่า'],['description','คำอธิบาย']]}
+};
+
+/* ---------- สิทธิ์ ---------- */
+function canEdit(key){
+  const r=RES[key]; if(!r) return false;
+  if(state.role==='admin') return true;
+  if(r.ro) return false;
+  const m=MODULES[r.m];
+  if(m.roles.includes(state.role)) return true;
+  if(state.role==='teacher' && r.teacher) return true;
+  return false;
+}
+function canView(key){
+  const r=RES[key]; if(!r) return false;
+  if(state.role==='admin') return true;
+  const m=MODULES[r.m];
+  if(m.roles.includes(state.role)||m.view.includes(state.role)) return true;
+  if(state.role==='teacher' && (r.teacher || r.m==='budget')) return true;
+  return false;
+}
+const ownOnly = () => state.role==='teacher';
+
+/* ============================================================
+   LANDING
+============================================================ */
+const FEATURES=[
+ ['bot','AI ควบคุมงบประมาณอัตโนมัติ','ใช้งบ &lt;80% บันทึกปกติ • 80-99% เตือนก่อนบันทึก • ≥100% บล็อกทันที ป้องกันใช้เกินงบ'],
+ ['spell-check','แปลงเลขเป็นตัวอักษรไทย 100%','ตามหลักราชบัณฑิตยสภา 101 → “หนึ่งร้อยเอ็ดบาทถ้วน” • 0.50 → “ศูนย์บาทห้าสิบสตางค์”'],
+ ['stamp','ตราครุฑ + ลายเซ็นอัตโนมัติ','เอกสารทุกใบแนบตราครุฑและลายเซ็นดิจิทัล พร้อมพิมพ์ ไม่ต้องเซ็นซ้ำ'],
+ ['files','สร้างเอกสาร 26 ประเภทใน 30 วินาที','ใบเสร็จ ใบสำคัญจ่าย 8708 8500 บก.111 PO ใบตรวจรับ ฯลฯ คลิกเดียวพร้อมส่ง'],
+ ['calendar-clock','ปีงบประมาณไทย (ต.ค.-ก.ย.)','คำนวณและแยกปีงบประมาณอัตโนมัติ ไม่ต้องนั่งแยกเอง'],
+ ['landmark','ธนาคาร 12 บัญชี + กระทบยอด','กระทบยอดสิ้นเดือนเสร็จใน 5 นาที พร้อมรายงานผลต่าง'],
+ ['graduation-cap','ห้องเรียนพิเศษ 7 ประเภท','EP / MEP / IEP / IP / Gifted / SMP / SMTE พร้อมอัตราค่าบำรุง เพิ่มเติมได้'],
+ ['history','Audit Log พร้อมส่ง สตง.','บันทึกทุกการกระทำในระบบ ย้อนดูได้ไม่จำกัด'],
+ ['key-round','Master Recovery Key','ลืมรหัสผ่านก็กู้คืนได้ ข้อมูลไม่สูญหาย']
+];
+const DEMO=[['admin','admin123','ผู้ดูแลระบบ'],['director','123456','ผู้อำนวยการ'],['finance','123456','ครูการเงิน'],['account','123456','ครูบัญชี'],['supply','123456','งานพัสดุ'],['planning','123456','งานแผนงาน'],['deputy','123456','รอง ผอ.'],['teacher','123456','ครู']];
+
+async function initLanding(){
+  $('fyNow').textContent = thaiFiscalYear();
+  $('landFeatures').innerHTML = FEATURES.map((f,i)=>`
+    <div class="card p-4 hover:shadow-md transition">
+      <div class="w-10 h-10 rounded-xl bg-gov-50 text-gov-700 flex items-center justify-center mb-2.5"><i data-lucide="${f[0]}" class="w-5 h-5"></i></div>
+      <p class="font-medium text-sm text-gov-900">${i+1}. ${f[1]}</p>
+      <p class="text-xs text-slate-500 mt-1 leading-relaxed">${f[2]}</p>
+    </div>`).join('');
+  $('demoAccts').innerHTML = DEMO.map(d=>`<button type="button" onclick="fillLogin('${d[0]}','${d[1]}')" class="text-[11px] border border-slate-200 rounded-lg px-2 py-1.5 hover:bg-gov-50 hover:border-gov-300 text-left"><b>${d[0]}</b><br><span class="text-slate-400">${d[2]}</span></button>`).join('');
+  icons();
+  try{
+    const [inc, alloc, assets, settings] = await Promise.all([
+      dbGet('incomes'), dbGet('budget_allocations'), dbGet('assets'), dbGet('system_settings')
+    ]);
+    const sName = settings.find(s=>s.setting_key==='school_name')?.setting_value;
+    if(sName) $('landSchool').textContent = sName;
+    const totInc = inc.reduce((a,b)=>a+Number(b.amount||0),0);
+    const totAl = alloc.reduce((a,b)=>a+Number(b.allocated_amount||0),0);
+    const totUs = alloc.reduce((a,b)=>a+Number(b.used_amount||0),0);
+    const stats=[
+      ['wallet','รับเงินสะสม','฿'+moneyS(totInc),'from-emerald-500 to-emerald-600'],
+      ['coins','งบที่ได้รับจัดสรร','฿'+moneyS(totAl),'from-gov-600 to-gov-700'],
+      ['trending-up','เบิกจ่ายแล้ว',(totAl? (totUs/totAl*100).toFixed(1):0)+'%','from-amber-500 to-orange-500'],
+      ['boxes','ครุภัณฑ์ในทะเบียน',moneyS(assets.length)+' รายการ','from-violet-500 to-purple-600']
+    ];
+    $('landStats').innerHTML = stats.map(s=>`
+      <div class="card p-3.5">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br ${s[3]} text-white flex items-center justify-center shrink-0"><i data-lucide="${s[0]}" class="w-5 h-5"></i></div>
+          <div class="min-w-0"><p class="text-[11px] text-slate-500 truncate">${s[1]}</p><p class="text-base sm:text-xl font-semibold text-gov-900 truncate">${s[2]}</p></div>
+        </div>
+      </div>`).join('');
+    icons();
+    drawChart('landChart1','bar',{labels:alloc.map(a=>a.project_code),datasets:[
+      {label:'จัดสรร',data:alloc.map(a=>a.allocated_amount),backgroundColor:'#b3cdec'},
+      {label:'ใช้ไป',data:alloc.map(a=>a.used_amount),backgroundColor:'#1f4d94'}]});
+    const bySrc={}; inc.forEach(i=>bySrc[i.income_source]=(bySrc[i.income_source]||0)+Number(i.amount||0));
+    drawChart('landChart2','doughnut',{labels:Object.keys(bySrc),datasets:[{data:Object.values(bySrc),backgroundColor:['#1f4d94','#4f83cc','#82aade','#b3cdec','#d8e6f6']}]});
+  }catch(e){
+    $('landStats').innerHTML = `<div class="col-span-full card p-4 text-center text-sm text-red-600">⚠️ เชื่อมต่อฐานข้อมูลไม่ได้ — ตรวจสอบ config.js และรัน schema.sql แล้วหรือยัง<br><span class="text-xs text-slate-500">${esc(e.message||'')}</span></div>`;
+  }
+}
+function drawChart(id,type,data,opt={}){
+  const c=$(id); if(!c) return;
+  if(state.charts[id]) state.charts[id].destroy();
+  state.charts[id]=new Chart(c,{type,data,options:Object.assign({
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{font:{family:'Kanit',size:11}}}},
+    scales: type==='doughnut'||type==='pie' ? {} : {
+      x:{ticks:{font:{family:'Kanit',size:10}}},
+      y:{ticks:{font:{family:'Kanit',size:10},callback:v=>moneyS(v)}}}
+  },opt)});
+}
+function gotoLogin(){ $('pageLanding').classList.add('hidden'); $('pageLogin').classList.remove('hidden'); icons(); }
+function gotoLanding(){ $('pageLogin').classList.add('hidden'); $('pageLanding').classList.remove('hidden'); }
+function fillLogin(u,p){ $('liUser').value=u; $('liPass').value=p; }
+function togglePass(){ const i=$('liPass'); i.type = i.type==='password'?'text':'password'; }
+
+/* ============================================================
+   LOGIN
+============================================================ */
+async function sha256(t){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+
+$('loginForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const u=$('liUser').value.trim(), p=$('liPass').value;
+  $('loginErr').classList.add('hidden');
+  showLoader('กำลังตรวจสอบสิทธิ์...');
+  try{
+    const rows = await dbGet('users',{select:'*, roles(role_code, role_name)', eq:{username:u}});
+    if(!rows.length) throw new Error('ไม่พบชื่อผู้ใช้นี้ในระบบ');
+    const usr = rows[0];
+    const stored = usr.password_hash||'';
+    const ok = stored.length===64 ? (await sha256(p))===stored : p===stored;
+    if(!ok) throw new Error('รหัสผ่านไม่ถูกต้อง');
+    if(usr.status!=='active') throw new Error('บัญชีนี้ถูกระงับการใช้งาน');
+    state.user=usr; state.role=usr.roles?.role_code||'teacher';
+    sessionStorage.setItem('sfa_user', JSON.stringify({id:usr.user_id}));
+    await sbClient.from('users').update({last_login:new Date().toISOString()}).eq('user_id',usr.user_id);
+    logAudit('LOGIN','users',usr.user_id,'เข้าสู่ระบบสำเร็จ');
+    await enterApp();
+  }catch(err){
+    $('loginErr').textContent = err.message||'เข้าสู่ระบบไม่สำเร็จ';
+    $('loginErr').classList.remove('hidden');
+  }finally{ hideLoader(); }
+});
+
+function openRecovery(){
+  openModal('กู้คืนรหัสผ่านด้วย Master Recovery Key', `
+    <div class="space-y-3">
+      <p class="text-xs text-slate-500">กรอก Master Recovery Key เพื่อรีเซ็ตรหัสผ่านของผู้ใช้</p>
+      <div><label class="text-xs font-medium">Master Recovery Key</label><input id="rcKey" class="inp mt-1" placeholder="SFA-MASTER-xxxx"></div>
+      <div><label class="text-xs font-medium">ชื่อผู้ใช้ที่ต้องการรีเซ็ต</label><input id="rcUser" class="inp mt-1"></div>
+      <div><label class="text-xs font-medium">รหัสผ่านใหม่</label><input id="rcPass" class="inp mt-1"></div>
+    </div>`,
+    [{t:'ยกเลิก',c:'btn-g',fn:closeModal},{t:'รีเซ็ตรหัสผ่าน',c:'btn-p',fn:doRecovery}]);
+}
+async function doRecovery(){
+  const k=$('rcKey').value.trim(), u=$('rcUser').value.trim(), p=$('rcPass').value.trim();
+  if(!k||!u||!p) return toast('กรอกข้อมูลให้ครบ','warn');
+  showLoader('กำลังตรวจสอบ Recovery Key...');
+  try{
+    const s=await dbGet('system_settings',{eq:{setting_key:'master_recovery_key'}});
+    if(!s.length || s[0].setting_value!==k) throw new Error('Master Recovery Key ไม่ถูกต้อง');
+    const us=await dbGet('users',{eq:{username:u}});
+    if(!us.length) throw new Error('ไม่พบผู้ใช้นี้');
+    await dbUpdate('users','user_id',us[0].user_id,{password_hash:p});
+    logAudit('RECOVERY','users',us[0].user_id,'รีเซ็ตรหัสผ่านด้วย Master Key');
+    closeModal(); toast('รีเซ็ตรหัสผ่านสำเร็จแล้ว');
+  }catch(e){ toast(e.message,'error'); } finally{ hideLoader(); }
+}
+
+/* ============================================================
+   APP SHELL
+============================================================ */
+async function enterApp(){
+  $('pageLanding').classList.add('hidden'); $('pageLogin').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  const u=state.user;
+  $('sbName').textContent=u.fullname; $('sbRole').textContent=u.roles?.role_name||'-';
+  $('sbAvatar').textContent=(u.fullname||'?').trim().charAt(0);
+  state.fys = await dbGet('fiscal_years',{order:'fiscal_year_id',asc:false});
+  const act = state.fys.find(f=>f.is_active)||state.fys[0];
+  state.fy = act?.fiscal_year_id||null;
+  $('fySelect').innerHTML = state.fys.map(f=>`<option value="${f.fiscal_year_id}" ${f.fiscal_year_id===state.fy?'selected':''}>${esc(f.year_title)}</option>`).join('');
+  buildMenu(); go('dashboard');
+}
+function changeFY(v){ state.fy=Number(v); go(state.page); toast('เปลี่ยนปีงบประมาณแล้ว','info'); }
+
+function menuTree(){
+  const tree=[{key:'dashboard',t:'แดชบอร์ด',i:'layout-dashboard'},{key:'documents',t:'สร้างเอกสารราชการ',i:'printer'}];
+  const groups={};
+  Object.entries(RES).forEach(([k,r])=>{ if(!canView(k)) return; (groups[r.m]=groups[r.m]||[]).push({key:k,t:r.t,i:r.i}); });
+  return {tree,groups};
+}
+function buildMenu(){
+  const {tree,groups}=menuTree();
+  let h = tree.map(x=>`<div class="navitem" data-k="${x.key}" onclick="go('${x.key}')"><i data-lucide="${x.i}" class="w-4 h-4"></i> ${x.t}</div>`).join('');
+  Object.entries(groups).forEach(([m,items])=>{
+    h += `<p class="text-[10px] uppercase tracking-wide text-gov-400 px-3 pt-3 pb-1">${MODULES[m].n}</p>`;
+    h += items.map(x=>`<div class="navitem" data-k="${x.key}" onclick="go('${x.key}')"><i data-lucide="${x.i}" class="w-4 h-4 shrink-0"></i> <span class="truncate">${x.t}</span></div>`).join('');
+  });
+  h += `<p class="text-[10px] uppercase tracking-wide text-gov-400 px-3 pt-3 pb-1">บัญชีผู้ใช้</p>
+        <div class="navitem" data-k="profile" onclick="go('profile')"><i data-lucide="user-cog" class="w-4 h-4"></i> ข้อมูลส่วนตัว</div>`;
+  $('sideMenu').innerHTML=h;
+
+  // Bottom nav
+  const quick=[{key:'dashboard',t:'หน้าหลัก',i:'home'}];
+  const first = Object.values(groups)[0]?.slice(0,2)||[];
+  first.forEach(f=>quick.push({key:f.key,t:f.t.slice(0,8),i:f.i}));
+  quick.push({key:'documents',t:'เอกสาร',i:'printer'});
+  while(quick.length<4) quick.push({key:'profile',t:'โปรไฟล์',i:'user'});
+  const left=quick.slice(0,2), right=quick.slice(2,4);
+  const bn = x=>`<button onclick="go('${x.key}')" data-bn="${x.key}" class="flex flex-col items-center gap-0.5 py-2 text-[10px] text-slate-500"><i data-lucide="${x.i}" class="w-5 h-5"></i><span class="truncate max-w-[60px]">${x.t}</span></button>`;
+  $('bnItems').innerHTML = left.map(bn).join('') +
+    `<button onclick="toggleMore()" class="flex flex-col items-center -mt-5">
+       <span class="w-12 h-12 rounded-full bg-gov-700 text-white flex items-center justify-center shadow-lg"><i data-lucide="grid-3x3" class="w-5 h-5"></i></span>
+       <span class="text-[10px] text-gov-700 mt-0.5">เมนู</span></button>` +
+    right.map(bn).join('');
+
+  // More panel grid
+  let g='';
+  Object.entries(groups).forEach(([m,items])=>{
+    g += `<p class="col-span-full text-[11px] font-medium text-gov-700 mt-1">${MODULES[m].n}</p>`;
+    g += items.map(x=>`<button onclick="go('${x.key}');toggleMore()" class="border border-slate-200 rounded-xl p-2.5 flex flex-col items-center gap-1.5 hover:bg-gov-50 active:scale-95 transition">
+      <i data-lucide="${x.i}" class="w-5 h-5 text-gov-600"></i><span class="text-[10px] text-center leading-tight text-slate-600">${x.t}</span></button>`).join('');
+  });
+  g += `<p class="col-span-full text-[11px] font-medium text-gov-700 mt-1">อื่นๆ</p>
+    <button onclick="go('documents');toggleMore()" class="border border-slate-200 rounded-xl p-2.5 flex flex-col items-center gap-1.5"><i data-lucide="printer" class="w-5 h-5 text-gov-600"></i><span class="text-[10px] text-slate-600">เอกสาร</span></button>
+    <button onclick="go('profile');toggleMore()" class="border border-slate-200 rounded-xl p-2.5 flex flex-col items-center gap-1.5"><i data-lucide="user-cog" class="w-5 h-5 text-gov-600"></i><span class="text-[10px] text-slate-600">โปรไฟล์</span></button>
+    <button onclick="toggleMore();openLogout()" class="border border-red-200 rounded-xl p-2.5 flex flex-col items-center gap-1.5"><i data-lucide="log-out" class="w-5 h-5 text-red-600"></i><span class="text-[10px] text-red-600">ออกจากระบบ</span></button>`;
+  $('moreGrid').innerHTML=g;
+  icons();
+}
+function toggleMore(){ state.more=!state.more; $('morePanel').classList.toggle('hidden',!state.more); icons(); }
+function openLogout(){ $('logoutModal').classList.remove('hidden'); icons(); }
+function closeLogout(){ $('logoutModal').classList.add('hidden'); }
+function doLogout(){
+  logAudit('LOGOUT','users',state.user?.user_id,'ออกจากระบบ');
+  state.user=null; state.role='guest'; sessionStorage.removeItem('sfa_user');
+  closeLogout(); $('app').classList.add('hidden'); $('view').innerHTML='';
+  $('liUser').value=''; $('liPass').value=''; $('loginErr').classList.add('hidden');
+  gotoLanding(); toast('ออกจากระบบเรียบร้อย','info');
+}
+
+/* ---------- Router ---------- */
+function go(key){
+  state.page=key;
+  document.querySelectorAll('.navitem').forEach(n=>n.classList.toggle('active', n.dataset.k===key));
+  document.querySelectorAll('[data-bn]').forEach(n=>n.classList.toggle('text-gov-700', n.dataset.bn===key));
+  if(key==='dashboard'){ setTitle('แดชบอร์ด','ภาพรวมระบบการเงินและบัญชี'); renderDashboard(); }
+  else if(key==='documents'){ setTitle('สร้างเอกสารราชการ','เอกสาร 26 ประเภท พร้อมตราครุฑและลายเซ็น'); renderDocs(); }
+  else if(key==='profile'){ setTitle('ข้อมูลส่วนตัว','แก้ไขโปรไฟล์และลายเซ็น'); renderProfile(); }
+  else if(RES[key]){ const r=RES[key]; setTitle(r.t, MODULES[r.m].n); renderList(key); }
+  else { $('view').innerHTML='<div class="card p-6 text-center text-slate-500">ไม่พบหน้าที่ต้องการ</div>'; }
+  window.scrollTo(0,0);
+}
+function setTitle(t,s){ $('pgTitle').textContent=t; $('pgSub').textContent=s; }
+
+/* ============================================================
+   DASHBOARD
+============================================================ */
+async function renderDashboard(){
+  $('view').innerHTML='<div class="card p-8 text-center text-slate-400 text-sm">กำลังโหลดแดชบอร์ด...</div>';
+  showLoader('กำลังประมวลผลข้อมูล...');
+  try{
+    const fy=state.fy;
+    const [inc,alloc,dis,assets,pr,loans,banks] = await Promise.all([
+      dbGet('incomes',{eq:{fiscal_year_id:fy}}), dbGet('budget_allocations',{eq:{fiscal_year_id:fy}}),
+      dbGet('disbursements',{eq:{fiscal_year_id:fy}}), dbGet('assets'),
+      dbGet('purchase_requests'), dbGet('form_8500_loans'), dbGet('bank_accounts')
+    ]);
+    const tInc=inc.reduce((a,b)=>a+ +b.amount,0);
+    const tAl=alloc.reduce((a,b)=>a+ +b.allocated_amount,0);
+    const tUs=alloc.reduce((a,b)=>a+ +b.used_amount,0);
+    const tDis=dis.filter(d=>d.approval_status==='paid').reduce((a,b)=>a+ +b.total_amount,0);
+    const pend=dis.filter(d=>d.approval_status==='pending').length;
+    const tBank=banks.reduce((a,b)=>a+ +b.current_balance,0);
+    const overdue=loans.filter(l=>l.cleared_status!=='cleared' && l.due_date && new Date(l.due_date)<new Date());
+    const pct = tAl? (tUs/tAl*100) : 0;
+
+    const card=(i,l,v,sub,g)=>`<div class="card p-3.5">
+      <div class="flex items-start gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br ${g} text-white flex items-center justify-center shrink-0"><i data-lucide="${i}" class="w-4.5 h-4.5"></i></div>
+        <div class="min-w-0 flex-1"><p class="text-[11px] text-slate-500 truncate">${l}</p>
+        <p class="text-base sm:text-lg font-semibold text-gov-900 truncate">${v}</p>
+        <p class="text-[10px] text-slate-400 truncate">${sub}</p></div>
+      </div></div>`;
+
+    let h = `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 fade-in">
+      ${card('hand-coins','รับเงินปีงบนี้','฿'+moneyS(tInc), inc.length+' รายการ','from-emerald-500 to-emerald-600')}
+      ${card('coins','งบจัดสรร','฿'+moneyS(tAl), alloc.length+' โครงการ','from-gov-600 to-gov-700')}
+      ${card('receipt','เบิกจ่ายแล้ว','฿'+moneyS(tDis), pend+' รายการรออนุมัติ','from-amber-500 to-orange-500')}
+      ${card('landmark','ยอดเงินฝากธนาคาร','฿'+moneyS(tBank), banks.length+' บัญชี','from-violet-500 to-purple-600')}
+    </div>`;
+
+    // AI budget monitor
+    const lvl = pct>=100?['red','บล็อกการเบิกจ่าย — ใช้งบเต็มวงเงินแล้ว']:pct>=80?['amber','เตือน — ใช้งบเกิน 80% ควรตรวจสอบ']:['emerald','ปกติ — ใช้งบอยู่ในเกณฑ์'];
+    h += `<div class="card p-4 mt-3">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-medium text-sm flex items-center gap-2"><i data-lucide="bot" class="w-4 h-4 text-gov-600"></i> AI ควบคุมงบประมาณอัตโนมัติ</h3>
+        <span class="badge bg-${lvl[0]}-50 text-${lvl[0]}-700">${pct.toFixed(1)}%</span>
+      </div>
+      <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-${lvl[0]}-500 transition-all" style="width:${Math.min(pct,100)}%"></div></div>
+      <p class="text-xs text-${lvl[0]}-700 mt-2">${lvl[1]}</p>
+      <div class="grid sm:grid-cols-3 gap-2 mt-3 text-xs">
+        <div class="bg-slate-50 rounded-lg p-2.5"><p class="text-slate-500">จัดสรร</p><p class="font-medium">฿${money(tAl)}</p></div>
+        <div class="bg-slate-50 rounded-lg p-2.5"><p class="text-slate-500">ใช้ไป</p><p class="font-medium">฿${money(tUs)}</p></div>
+        <div class="bg-slate-50 rounded-lg p-2.5"><p class="text-slate-500">คงเหลือ</p><p class="font-medium text-emerald-700">฿${money(tAl-tUs)}</p></div>
+      </div></div>`;
+
+    // Alerts
+    const risky = alloc.filter(a=> a.allocated_amount>0 && (a.used_amount/a.allocated_amount)>=0.8);
+    if(risky.length||overdue.length){
+      h += `<div class="card p-4 mt-3 border-amber-200 bg-amber-50/50">
+        <h3 class="font-medium text-sm text-amber-800 flex items-center gap-2 mb-2"><i data-lucide="alert-triangle" class="w-4 h-4"></i> การแจ้งเตือนอัจฉริยะ</h3>
+        <ul class="space-y-1.5 text-xs text-amber-900">
+        ${risky.map(a=>`<li>• โครงการ <b>${esc(a.project_name)}</b> ใช้งบแล้ว ${(a.used_amount/a.allocated_amount*100).toFixed(1)}% (คงเหลือ ฿${money(a.remaining_amount)})</li>`).join('')}
+        ${overdue.map(l=>`<li>• สัญญายืมเงิน <b>${esc(l.contract_no)}</b> เกินกำหนดส่งใช้ (ครบกำหนด ${fmtDate(l.due_date)}) คงค้าง ฿${money(l.remaining_amount)}</li>`).join('')}
+        </ul></div>`;
+    }
+
+    h += `<div class="grid lg:grid-cols-3 gap-3 mt-3">
+      <div class="card p-4 lg:col-span-2"><h3 class="font-medium text-sm mb-3">งบประมาณรายโครงการ</h3><div class="h-64"><canvas id="dc1"></canvas></div></div>
+      <div class="card p-4"><h3 class="font-medium text-sm mb-3">สถานะครุภัณฑ์</h3><div class="h-64"><canvas id="dc2"></canvas></div></div>
+      <div class="card p-4 lg:col-span-3"><h3 class="font-medium text-sm mb-3">รับ-จ่ายรายเดือน (ปีงบประมาณปัจจุบัน)</h3><div class="h-64"><canvas id="dc3"></canvas></div></div>
+    </div>`;
+
+    h += `<div class="card p-4 mt-3"><h3 class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="activity" class="w-4 h-4 text-gov-600"></i> รายการล่าสุด</h3>
+      <div class="overflow-x-auto"><table class="w-full tbl"><thead><tr><th>วันที่</th><th>เลขที่</th><th>ผู้รับเงิน</th><th class="text-right">จำนวนเงิน</th><th>สถานะ</th></tr></thead><tbody>
+      ${dis.slice(-6).reverse().map(d=>`<tr><td>${fmtDate(d.request_date)}</td><td>${esc(d.voucher_no)}</td><td>${esc(d.payee_name)}</td><td class="text-right">${money(d.total_amount)}</td><td>${badgeStatus(d.approval_status)}</td></tr>`).join('')||'<tr><td colspan="5" class="text-center text-slate-400 py-4">ยังไม่มีข้อมูล</td></tr>'}
+      </tbody></table></div></div>`;
+
+    $('view').innerHTML=h; icons();
+    drawChart('dc1','bar',{labels:alloc.map(a=>a.project_code),datasets:[
+      {label:'จัดสรร',data:alloc.map(a=>a.allocated_amount),backgroundColor:'#b3cdec'},
+      {label:'ใช้ไป',data:alloc.map(a=>a.used_amount),backgroundColor:'#1f4d94'}]});
+    const st={}; assets.forEach(a=>st[a.status]=(st[a.status]||0)+1);
+    drawChart('dc2','doughnut',{labels:Object.keys(st),datasets:[{data:Object.values(st),backgroundColor:['#059669','#f59e0b','#ef4444','#64748b','#8b5cf6']}]});
+    const mi=Array(12).fill(0), mo=Array(12).fill(0);
+    inc.forEach(i=>{ if(i.received_date) mi[new Date(i.received_date).getMonth()] += +i.amount; });
+    dis.forEach(d=>{ const dt=d.pay_date||d.request_date; if(dt) mo[new Date(dt).getMonth()] += +d.total_amount; });
+    const ord=[9,10,11,0,1,2,3,4,5,6,7,8];
+    drawChart('dc3','line',{labels:ord.map(i=>TH_M[i]),datasets:[
+      {label:'รับเงิน',data:ord.map(i=>mi[i]),borderColor:'#059669',backgroundColor:'rgba(5,150,105,.12)',fill:true,tension:.35},
+      {label:'จ่ายเงิน',data:ord.map(i=>mo[i]),borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.1)',fill:true,tension:.35}]});
+  }catch(e){
+    $('view').innerHTML=`<div class="card p-6 text-center"><p class="text-red-600 text-sm">⚠️ โหลดแดชบอร์ดไม่สำเร็จ</p><p class="text-xs text-slate-500 mt-1">${esc(e.message)}</p></div>`;
+  }finally{ hideLoader(); }
+}
+function badgeStatus(s){
+  const m={pending:['amber','รออนุมัติ'],approved:['gov','อนุมัติแล้ว'],rejected:['red','ไม่อนุมัติ'],paid:['emerald','จ่ายแล้ว'],
+    active:['emerald','ใช้งาน'],inactive:['slate','ปิดใช้งาน'],draft:['slate','ร่าง'],submitted:['gov','ส่งแล้ว'],
+    cleared:['emerald','ส่งใช้ครบ'],partial:['amber','ส่งใช้บางส่วน'],balanced:['emerald','กระทบยอดแล้ว'],diff:['red','มีผลต่าง'],
+    planned:['slate','ตามแผน'],in_progress:['amber','ดำเนินการ'],completed:['emerald','เสร็จสิ้น'],cancelled:['red','ยกเลิก'],
+    open:['amber','ระหว่างดำเนินการ'],delivered:['emerald','ส่งมอบแล้ว'],closed:['slate','ปิดสัญญา'],
+    'ใช้งานปกติ':['emerald','ใช้งานปกติ'],'ชำรุด':['red','ชำรุด'],'รอจำหน่าย':['amber','รอจำหน่าย'],'จำหน่ายแล้ว':['slate','จำหน่ายแล้ว'],'สูญหาย':['red','สูญหาย']};
+  const x=m[s]||['slate',s||'-'];
+  const col={amber:'bg-amber-50 text-amber-700',gov:'bg-gov-50 text-gov-700',red:'bg-red-50 text-red-700',emerald:'bg-emerald-50 text-emerald-700',slate:'bg-slate-100 text-slate-600'}[x[0]];
+  return `<span class="badge ${col}">${esc(x[1])}</span>`;
+}
+
+/* ============================================================
+   GENERIC LIST + CRUD
+============================================================ */
+const listState={};
+async function refData(tb){ if(!state.cache[tb]) state.cache[tb]=await dbGet(tb); return state.cache[tb]; }
+
+async function renderList(key, keep=false){
+  const r=RES[key];
+  const ls = listState[key] = listState[key]||{q:'',page:1};
+  if(!keep) ls.page=1;
+  $('view').innerHTML=`<div class="card p-8 text-center text-slate-400 text-sm"><div class="w-8 h-8 mx-auto border-2 border-gov-200 border-t-gov-700 rounded-full animate-spin mb-2"></div>กำลังโหลด ${esc(r.t)}...</div>`;
+  try{
+    const eq={};
+    if(r.fy && state.fy) eq.fiscal_year_id=state.fy;
+    if(ownOnly() && r.by) eq[r.by]=state.user.user_id;
+    let rows = await dbGet(r.tb,{eq, order:r.pk, asc:false});
+    // preload refs
+    const refs={};
+    for(const f of r.f) if(f[2]==='ref') refs[f[0]] = await refData(f[3].tb);
+    const q=ls.q.toLowerCase();
+    let data = q ? rows.filter(x=>JSON.stringify(x).toLowerCase().includes(q)) : rows;
+    const per=10, tot=Math.max(1,Math.ceil(data.length/per));
+    if(ls.page>tot) ls.page=tot;
+    const pageRows=data.slice((ls.page-1)*per, ls.page*per);
+    const ed=canEdit(key);
+
+    let h=`<div class="flex flex-wrap items-center gap-2 mb-3">
+      <div class="relative flex-1 min-w-[160px]">
+        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+        <input id="lsQ" value="${esc(ls.q)}" oninput="searchList('${key}',this.value)" class="inp pl-9 !py-2" placeholder="ค้นหา...">
+      </div>
+      ${ed?`<button onclick="openForm('${key}')" class="btn btn-p"><i data-lucide="plus" class="w-4 h-4"></i> เพิ่มข้อมูล</button>`:''}
+      <button onclick="exportCSV('${key}')" class="btn btn-g"><i data-lucide="download" class="w-4 h-4"></i><span class="hidden sm:inline">CSV</span></button>
+    </div>`;
+
+    if(key==='budget_allocations'){
+      const tA=rows.reduce((a,b)=>a+ +b.allocated_amount,0), tU=rows.reduce((a,b)=>a+ +b.used_amount,0);
+      h += `<div class="grid grid-cols-3 gap-2 mb-3">
+        <div class="card p-3"><p class="text-[11px] text-slate-500">จัดสรรรวม</p><p class="font-semibold text-gov-900">฿${moneyS(tA)}</p></div>
+        <div class="card p-3"><p class="text-[11px] text-slate-500">ใช้ไป</p><p class="font-semibold text-amber-700">฿${moneyS(tU)}</p></div>
+        <div class="card p-3"><p class="text-[11px] text-slate-500">คงเหลือ</p><p class="font-semibold text-emerald-700">฿${moneyS(tA-tU)}</p></div></div>`;
+    }
+
+    h+=`<div class="card overflow-hidden"><div class="overflow-x-auto"><table class="w-full tbl"><thead><tr>
+      ${r.c.map(c=>`<th class="${c[2]==='money'?'text-right':''}">${c[1]}</th>`).join('')}<th class="text-right">จัดการ</th></tr></thead><tbody>`;
+    if(!pageRows.length) h+=`<tr><td colspan="${r.c.length+1}" class="text-center text-slate-400 py-8">ไม่พบข้อมูล</td></tr>`;
+    pageRows.forEach(row=>{
+      h+='<tr>'+r.c.map(c=>`<td class="${c[2]==='money'?'text-right whitespace-nowrap':''}">${cellVal(row,c,r)}</td>`).join('');
+      h+=`<td class="text-right whitespace-nowrap">
+        <button onclick="viewRec('${key}',${row[r.pk]})" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" title="ดู"><i data-lucide="eye" class="w-4 h-4"></i></button>
+        ${r.doc?`<button onclick="printRec('${key}',${row[r.pk]})" class="p-1.5 rounded-lg hover:bg-gov-50 text-gov-600" title="พิมพ์"><i data-lucide="printer" class="w-4 h-4"></i></button>`:''}
+        ${ed?`<button onclick="openForm('${key}',${row[r.pk]})" class="p-1.5 rounded-lg hover:bg-amber-50 text-amber-600" title="แก้ไข"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+        <button onclick="delRec('${key}',${row[r.pk]})" class="p-1.5 rounded-lg hover:bg-red-50 text-red-600" title="ลบ"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`:''}
+      </td></tr>`;
+    });
+    h+=`</tbody></table></div>
+      <div class="flex items-center justify-between px-3 py-2.5 border-t border-slate-100 text-xs text-slate-500">
+        <span>ทั้งหมด ${data.length} รายการ</span>
+        <div class="flex items-center gap-1">
+          <button onclick="pageList('${key}',-1)" class="btn btn-g !py-1 !px-2"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+          <span class="px-2">${ls.page}/${tot}</span>
+          <button onclick="pageList('${key}',1)" class="btn btn-g !py-1 !px-2"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+        </div></div></div>`;
+    $('view').innerHTML=h; icons();
+    listState[key]._rows=rows; listState[key]._refs=refs;
+  }catch(e){
+    $('view').innerHTML=`<div class="card p-6 text-center"><p class="text-red-600 text-sm">⚠️ โหลดข้อมูลไม่สำเร็จ</p><p class="text-xs text-slate-500 mt-1">${esc(e.message)}</p>
+      <button onclick="go('${key}')" class="btn btn-p mt-3">ลองใหม่</button></div>`;
+  }
+}
+function cellVal(row,c,r){
+  const v=row[c[0]], t=c[2];
+  if(t==='money') return money(v);
+  if(t==='date') return fmtDate(v);
+  if(t==='datetime') return v? fmtDate(v)+' '+new Date(v).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : '-';
+  if(t==='status') return badgeStatus(v);
+  if(t==='bool') return v? '<span class="badge bg-emerald-50 text-emerald-700">ใช่</span>':'<span class="badge bg-slate-100 text-slate-500">ไม่</span>';
+  if(t==='cancel') return v? '<span class="badge bg-red-50 text-red-700">ยกเลิก</span>':'<span class="badge bg-emerald-50 text-emerald-700">ปกติ</span>';
+  if(t==='pass') return v? '<span class="badge bg-emerald-50 text-emerald-700">ผ่าน</span>':'<span class="badge bg-red-50 text-red-700">ไม่ผ่าน</span>';
+  if(t==='winner') return v? '<span class="badge bg-emerald-50 text-emerald-700">ผู้ชนะ</span>':'<span class="badge bg-slate-100 text-slate-500">ไม่ชนะ</span>';
+  if(t==='inout') return v==='IN'? '<span class="badge bg-emerald-50 text-emerald-700">รับ</span>':'<span class="badge bg-red-50 text-red-700">จ่าย</span>';
+  if(t==='action') return `<span class="badge bg-gov-50 text-gov-700">${esc(v)}</span>`;
+  if(t==='img') return imgTag(v,'w-10 h-10 rounded-lg object-cover');
+  if(t==='pct'){ const p=row.allocated_amount? row.used_amount/row.allocated_amount*100:0;
+    const col=p>=100?'red':p>=80?'amber':'emerald';
+    return `<div class="flex items-center gap-1.5"><div class="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-${col}-500" style="width:${Math.min(p,100)}%"></div></div><span class="text-[11px] text-${col}-700">${p.toFixed(0)}%</span></div>`; }
+  if(t==='revenue') return money((row.fee_rate||0)*(row.student_count||0));
+  return esc(v ?? '-');
+}
+function searchList(k,v){ listState[k].q=v; listState[k].page=1; clearTimeout(window._st); window._st=setTimeout(()=>{ renderList(k,true); setTimeout(()=>{const i=$('lsQ'); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} },10); },300); }
+function pageList(k,d){ listState[k].page=Math.max(1,listState[k].page+d); renderList(k,true); }
+
+/* ---------- Modal ---------- */
+function openModal(title, body, buttons=[]){
+  $('modalTitle').textContent=title; $('modalBody').innerHTML=body;
+  $('modalFoot').innerHTML='';
+  buttons.forEach(b=>{ const btn=document.createElement('button'); btn.className='btn '+b.c; btn.innerHTML=b.t; btn.onclick=b.fn; $('modalFoot').appendChild(btn); });
+  $('modal').classList.remove('hidden'); icons();
+}
+function closeModal(){ $('modal').classList.add('hidden'); $('modalBody').innerHTML=''; }
+
+/* ---------- Form ---------- */
+let formCtx=null;
+async function openForm(key,id=null){
+  const r=RES[key];
+  showLoader('กำลังเตรียมแบบฟอร์ม...');
+  try{
+    let rec={};
+    if(id){ const d=await dbGet(r.tb,{eq:{[r.pk]:id}}); rec=d[0]||{}; }
+    const parts=[];
+    for(const f of r.f){
+      const [k,l,t,ex]=f; const v=rec[k];
+      let inp='';
+      if(t==='textarea') inp=`<textarea id="f_${k}" rows="2" class="inp">${esc(v??'')}</textarea>`;
+      else if(t==='select') inp=`<select id="f_${k}" class="inp"><option value="">-- เลือก --</option>${ex.map(o=>`<option ${v===o?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
+      else if(t==='ref'){ const opts=await refData(ex.tb);
+        inp=`<select id="f_${k}" class="inp"><option value="">-- เลือก --</option>${opts.map(o=>`<option value="${o[ex.pk]}" ${String(v)===String(o[ex.pk])?'selected':''}>${esc(ex.lb(o))}</option>`).join('')}</select>`; }
+      else if(t==='bool') inp=`<label class="flex items-center gap-2 pt-1.5"><input type="checkbox" id="f_${k}" ${v?'checked':''} class="w-4 h-4 accent-gov-700"><span class="text-sm text-slate-600">ใช่</span></label>`;
+      else if(t==='money'||t==='number') inp=`<input id="f_${k}" type="number" step="${t==='money'?'0.01':'1'}" value="${v??''}" class="inp">`;
+      else if(t==='date') inp=`<input id="f_${k}" type="date" value="${v??''}" class="inp">`;
+      else if(t==='pass') inp=`<input id="f_${k}" type="text" value="${esc(v??'')}" class="inp" placeholder="${id?'เว้นว่างหากไม่เปลี่ยน':'กำหนดรหัสผ่าน'}">`;
+      else if(t==='image') inp=`<div class="flex items-center gap-2 mt-1">
+          <div id="prev_${k}">${imgTag(v,'w-16 h-16 rounded-lg object-cover border border-slate-200')}</div>
+          <div class="flex-1"><input type="file" accept="image/*,.pdf" id="file_${k}" onchange="doUpload('${k}','${key}')" class="text-xs w-full">
+          <p id="up_${k}" class="text-[10px] text-slate-400 mt-1">ระบบจะบีบอัดภาพเป็น WebP อัตโนมัติ</p>
+          <input type="hidden" id="f_${k}" value="${esc(v??'')}"></div></div>`;
+      else inp=`<input id="f_${k}" value="${esc(v??'')}" class="inp">`;
+      parts.push(`<div class="${t==='textarea'||t==='image'?'sm:col-span-2':''}"><label class="text-xs font-medium text-slate-600">${l}</label>${t==='bool'?inp:'<div class="mt-1">'+inp+'</div>'}</div>`);
+    }
+    let extra='';
+    if(r.budget) extra=`<div id="budgetHint" class="sm:col-span-2 hidden rounded-xl p-3 text-xs"></div>`;
+    formCtx={key,id};
+    openModal((id?'แก้ไข: ':'เพิ่มข้อมูล: ')+r.t,
+      `<div class="grid sm:grid-cols-2 gap-3">${parts.join('')}${extra}</div>`,
+      [{t:'ยกเลิก',c:'btn-g',fn:closeModal},{t:'<i data-lucide="save" class="w-4 h-4"></i> บันทึก',c:'btn-p',fn:saveForm}]);
+    if(r.budget){ ['f_allocation_id','f_total_amount'].forEach(i=>{ const el=$(i); if(el) el.addEventListener('change',checkBudgetHint); }); checkBudgetHint(); }
+  }catch(e){ toast('เปิดฟอร์มไม่สำเร็จ: '+e.message,'error'); }
+  finally{ hideLoader(); }
+}
+async function doUpload(k,key){
+  const inp=$('file_'+k); if(!inp.files.length) return;
+  const st=$('up_'+k); st.textContent='กำลังอัปโหลด...'; st.className='text-[10px] text-gov-600 mt-1';
+  try{
+    const url=await uploadFile(inp.files[0], key);
+    $('f_'+k).value=url;
+    $('prev_'+k).innerHTML=imgTag(url,'w-16 h-16 rounded-lg object-cover border border-slate-200');
+    st.textContent='อัปโหลดสำเร็จ ✓'; st.className='text-[10px] text-emerald-600 mt-1';
+  }catch(e){ st.textContent='อัปโหลดล้มเหลว: '+e.message; st.className='text-[10px] text-red-600 mt-1'; }
+}
+async function checkBudgetHint(){
+  const box=$('budgetHint'); if(!box) return;
+  const aid=$('f_allocation_id')?.value, amt=Number($('f_total_amount')?.value||0);
+  if(!aid){ box.classList.add('hidden'); return; }
+  const alloc=(await refData('budget_allocations')).find(a=>String(a.allocation_id)===String(aid));
+  if(!alloc){ box.classList.add('hidden'); return; }
+  const used=Number(alloc.used_amount)+amt, tot=Number(alloc.allocated_amount)||1;
+  const pct=used/tot*100;
+  const cfg = pct>=100? ['bg-red-50 text-red-800 border border-red-200','⛔ บล็อก! ใช้งบเกินวงเงิน ไม่สามารถบันทึกได้']
+            : pct>=80 ? ['bg-amber-50 text-amber-800 border border-amber-200','⚠️ เตือน! การใช้งบจะเกิน 80% ของวงเงิน']
+            : ['bg-emerald-50 text-emerald-800 border border-emerald-200','✅ ปกติ สามารถบันทึกได้'];
+  box.className='sm:col-span-2 rounded-xl p-3 text-xs '+cfg[0];
+  box.innerHTML=`<p class="font-medium">AI ควบคุมงบประมาณ: ${cfg[1]}</p>
+    <p class="mt-1">วงเงิน ฿${money(tot)} • ใช้ไปแล้ว ฿${money(alloc.used_amount)} • รายการนี้ ฿${money(amt)} → รวม ${pct.toFixed(1)}%</p>`;
+  box.classList.remove('hidden');
+}
+async function saveForm(){
+  const {key,id}=formCtx; const r=RES[key];
+  const row={};
+  for(const f of r.f){
+    const [k,l,t]=f; const el=$('f_'+k); if(!el) continue;
+    let v = t==='bool' ? el.checked : el.value;
+    if(t==='money'||t==='number') v = v===''? null : Number(v);
+    if(t==='ref') v = v===''? null : Number(v);
+    if(t==='pass' && id && v==='') continue;
+    if(v==='') v=null;
+    row[k]=v;
+  }
+  // required check
+  const req=r.f[0];
+  if(req && (row[req[0]]===null||row[req[0]]===undefined)) return toast('กรุณากรอก '+req[1],'warn');
+  // auto fields
+  if(r.fy) row.fiscal_year_id = state.fy;
+  if(r.by && !id) row[r.by] = row[r.by] ?? state.user.user_id;
+  // AI budget guard
+  if(r.budget && row.allocation_id){
+    const alloc=(await dbGet('budget_allocations',{eq:{allocation_id:row.allocation_id}}))[0];
+    if(alloc){
+      const amt=Number(row.total_amount||0);
+      const newUsed=Number(alloc.used_amount)+ (id?0:amt);
+      const pct=Number(alloc.allocated_amount)? newUsed/Number(alloc.allocated_amount)*100 : 0;
+      if(pct>=100){ return toast('⛔ บล็อกการบันทึก: การใช้งบจะเกิน 100% ของวงเงินโครงการ','error'); }
+      if(pct>=80){ const ok=await confirmBox(`การใช้งบจะอยู่ที่ ${pct.toFixed(1)}% ของวงเงิน ต้องการบันทึกต่อหรือไม่?`,'⚠️ เตือนการใช้งบประมาณ',false); if(!ok) return; }
+    }
+  }
+  showLoader('กำลังบันทึกข้อมูล...');
+  try{
+    if(id){ await dbUpdate(r.tb,r.pk,id,row); logAudit('UPDATE',r.tb,id,`แก้ไข ${r.t}`); toast('แก้ไขข้อมูลเรียบร้อย'); }
+    else { const d=await dbInsert(r.tb,row); logAudit('CREATE',r.tb,d?.[0]?.[r.pk],`เพิ่ม ${r.t}`); toast('บันทึกข้อมูลเรียบร้อย');
+      // อัปเดตยอดใช้งบอัตโนมัติ
+      if(r.budget && row.allocation_id){
+        const a=(await dbGet('budget_allocations',{eq:{allocation_id:row.allocation_id}}))[0];
+        if(a) await dbUpdate('budget_allocations','allocation_id',a.allocation_id,{used_amount:Number(a.used_amount)+Number(row.total_amount||0)});
+      }
+    }
+    delete state.cache[r.tb]; delete state.cache['budget_allocations'];
+    closeModal(); renderList(key,true);
+  }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); }
+  finally{ hideLoader(); }
+}
+async function delRec(key,id){
+  const r=RES[key];
+  const ok=await confirmBox(`ต้องการลบรายการนี้ออกจาก "${r.t}" ใช่หรือไม่? การลบไม่สามารถย้อนกลับได้`,'ยืนยันการลบข้อมูล');
+  if(!ok) return;
+  showLoader('กำลังลบข้อมูล...');
+  try{ await dbDelete(r.tb,r.pk,id); logAudit('DELETE',r.tb,id,`ลบ ${r.t}`); delete state.cache[r.tb]; toast('ลบข้อมูลเรียบร้อย'); renderList(key,true); }
+  catch(e){ toast('ลบไม่สำเร็จ: '+e.message,'error'); } finally{ hideLoader(); }
+}
+async function viewRec(key,id){
+  const r=RES[key];
+  showLoader('กำลังโหลด...');
+  try{
+    const rec=(await dbGet(r.tb,{eq:{[r.pk]:id}}))[0];
+    if(!rec) throw new Error('ไม่พบข้อมูล');
+    let rows='';
+    for(const [k,v] of Object.entries(rec)){
+      const f=r.f.find(x=>x[0]===k);
+      const label=f?f[1]:k;
+      let val=v;
+      if(f&&f[2]==='ref'){ const o=(await refData(f[3].tb)).find(o=>String(o[f[3].pk])===String(v)); val=o?f[3].lb(o):'-'; }
+      else if(f&&(f[2]==='money')) val=money(v);
+      else if(f&&f[2]==='date') val=fmtDate(v);
+      else if(f&&f[2]==='image') val = v? `<a href="${esc(v)}" target="_blank" class="text-gov-600 underline">เปิดไฟล์</a>`:'-';
+      else if(typeof v==='boolean') val= v?'ใช่':'ไม่';
+      rows+=`<tr><td class="text-slate-500 w-2/5">${esc(label)}</td><td class="font-medium">${f&&f[2]==='image'?val:esc(val??'-')}</td></tr>`;
+    }
+    const amtKey=['total_amount','amount','allocated_amount','amount_borrowed','requested_amount','transfer_amount','offered_price'].find(k=>rec[k]!=null);
+    const bt = amtKey? `<div class="mt-3 bg-gov-50 border border-gov-100 rounded-xl p-3 text-xs"><p class="text-slate-500">จำนวนเงินเป็นตัวอักษร</p><p class="font-medium text-gov-900">(${bahtText(rec[amtKey])})</p></div>`:'';
+    openModal('รายละเอียด: '+r.t, `<div class="overflow-x-auto"><table class="w-full tbl">${rows}</table></div>${bt}`,
+      [{t:'ปิด',c:'btn-g',fn:closeModal}].concat(r.doc?[{t:'<i data-lucide="printer" class="w-4 h-4"></i> พิมพ์เอกสาร',c:'btn-p',fn:()=>printRec(key,id)}]:[]));
+  }catch(e){ toast(e.message,'error'); } finally{ hideLoader(); }
+}
+function exportCSV(key){
+  const r=RES[key], rows=listState[key]?._rows||[];
+  if(!rows.length) return toast('ไม่มีข้อมูลให้ส่งออก','warn');
+  const cols=Object.keys(rows[0]);
+  const csv='\uFEFF'+[cols.join(','),...rows.map(x=>cols.map(c=>`"${String(x[c]??'').replace(/"/g,'""')}"`).join(','))].join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`${r.tb}_${Date.now()}.csv`; a.click();
+  logAudit('EXPORT',r.tb,'','ดาวน์โหลด CSV'); toast('ดาวน์โหลดไฟล์เรียบร้อย');
+}
+
+/* ============================================================
+   PROFILE
+============================================================ */
+async function renderProfile(){
+  const u=state.user;
+  $('view').innerHTML=`<div class="grid lg:grid-cols-3 gap-3 fade-in">
+    <div class="card p-5 text-center">
+      <div class="flex justify-center">${imgTag(u.avatar_url,'w-24 h-24 rounded-2xl object-cover border border-slate-200')}</div>
+      <p class="font-medium mt-3 text-gov-900">${esc(u.fullname)}</p>
+      <p class="text-xs text-slate-500">${esc(u.position||'-')}</p>
+      <span class="badge bg-gov-50 text-gov-700 mt-2">${esc(u.roles?.role_name||'-')}</span>
+      <div class="mt-4 text-left space-y-1.5 text-xs text-slate-600">
+        <p><i data-lucide="user" class="w-3.5 h-3.5 inline"></i> ${esc(u.username)}</p>
+        <p><i data-lucide="mail" class="w-3.5 h-3.5 inline"></i> ${esc(u.email||'-')}</p>
+        <p><i data-lucide="phone" class="w-3.5 h-3.5 inline"></i> ${esc(u.phone||'-')}</p>
+      </div>
+    </div>
+    <div class="card p-5 lg:col-span-2">
+      <h3 class="font-medium text-sm mb-3">แก้ไขข้อมูลส่วนตัว</h3>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="text-xs font-medium text-slate-600">ชื่อ-สกุล</label><input id="pfName" class="inp mt-1" value="${esc(u.fullname||'')}"></div>
+        <div><label class="text-xs font-medium text-slate-600">ตำแหน่ง</label><input id="pfPos" class="inp mt-1" value="${esc(u.position||'')}"></div>
+        <div><label class="text-xs font-medium text-slate-600">อีเมล</label><input id="pfMail" class="inp mt-1" value="${esc(u.email||'')}"></div>
+        <div><label class="text-xs font-medium text-slate-600">โทรศัพท์</label><input id="pfTel" class="inp mt-1" value="${esc(u.phone||'')}"></div>
+        <div><label class="text-xs font-medium text-slate-600">รหัสผ่านใหม่</label><input id="pfPass" class="inp mt-1" placeholder="เว้นว่างหากไม่เปลี่ยน"></div>
+        <div><label class="text-xs font-medium text-slate-600">รูปโปรไฟล์</label>
+          <input type="file" accept="image/*" id="pfAvaFile" onchange="upProfile('avatar_url','pfAva')" class="text-xs mt-2 w-full"><p id="pfAvaSt" class="text-[10px] text-slate-400"></p>
+          <input type="hidden" id="pfAva" value="${esc(u.avatar_url||'')}"></div>
+        <div class="sm:col-span-2"><label class="text-xs font-medium text-slate-600">ลายเซ็นอิเล็กทรอนิกส์ (ใช้ในเอกสารอัตโนมัติ)</label>
+          <div class="flex items-center gap-3 mt-1">
+            <div id="pfSigPrev" class="shrink-0">${imgTag(u.signature_url,'w-28 h-14 object-contain border border-slate-200 rounded-lg bg-white')}</div>
+            <div class="flex-1"><input type="file" accept="image/*" id="pfSigFile" onchange="upProfile('signature_url','pfSig')" class="text-xs w-full">
+            <p id="pfSigSt" class="text-[10px] text-slate-400 mt-1">แนะนำภาพพื้นหลังขาว ระบบจะบีบอัดอัตโนมัติ</p>
+            <input type="hidden" id="pfSig" value="${esc(u.signature_url||'')}"></div>
+          </div></div>
+      </div>
+      <button onclick="saveProfile()" class="btn btn-p mt-4"><i data-lucide="save" class="w-4 h-4"></i> บันทึกข้อมูล</button>
+    </div></div>`;
+  icons();
+}
+async function upProfile(field,inputId){
+  const map={avatar_url:['pfAvaFile','pfAvaSt'],signature_url:['pfSigFile','pfSigSt']};
+  const [fid,sid]=map[field]; const f=$(fid).files[0]; if(!f) return;
+  $(sid).textContent='กำลังอัปโหลด...';
+  try{ const url=await uploadFile(f,'profile'); $(inputId).value=url;
+    if(field==='signature_url') $('pfSigPrev').innerHTML=imgTag(url,'w-28 h-14 object-contain border border-slate-200 rounded-lg bg-white');
+    $(sid).textContent='อัปโหลดสำเร็จ ✓'; }
+  catch(e){ $(sid).textContent='อัปโหลดล้มเหลว: '+e.message; }
+}
+async function saveProfile(){
+  showLoader('กำลังบันทึก...');
+  try{
+    const row={fullname:$('pfName').value,position:$('pfPos').value,email:$('pfMail').value,phone:$('pfTel').value,
+      avatar_url:$('pfAva').value||null, signature_url:$('pfSig').value||null};
+    if($('pfPass').value.trim()) row.password_hash=$('pfPass').value.trim();
+    await dbUpdate('users','user_id',state.user.user_id,row);
+    Object.assign(state.user,row);
+    $('sbName').textContent=row.fullname;
+    logAudit('UPDATE','users',state.user.user_id,'แก้ไขข้อมูลส่วนตัว');
+    toast('บันทึกข้อมูลเรียบร้อย'); renderProfile();
+  }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); } finally{ hideLoader(); }
+}
+
+/* ============================================================
+   เอกสารราชการ 26 ประเภท + ตราครุฑ + ลายเซ็น
+============================================================ */
+const GARUDA='https://upload.wikimedia.org/wikipedia/commons/thumb/9/95/Garuda_Emblem_of_Thailand.svg/240px-Garuda_Emblem_of_Thailand.svg.png';
+const DOC_TYPES=[
+ ['receipt','ใบเสร็จรับเงิน','receipts','receipt_id',r=>`${r.receipt_no} - ${r.payer_name}`,'receipt'],
+ ['incslip','ใบสำคัญรับเงิน','incomes','income_id',r=>`${r.ref_no||''} ${r.income_type}`,'hand-coins'],
+ ['deposit','ใบนำเงินฝากธนาคาร','bank_deposits','deposit_id',r=>`${r.deposit_slip_ref} (${money(r.amount)})`,'landmark'],
+ ['cashbook','รายงานสมุดเงินสด','cash_book_logs','cash_log_id',r=>`${r.transaction_date} ${r.description||''}`,'book-open'],
+ ['cashdaily','รายงานเงินคงเหลือประจำวัน','cash_book_logs','cash_log_id',r=>`${r.transaction_date} คงเหลือ ${money(r.balance_after)}`,'calendar-check'],
+ ['incmonth','รายงานรับเงินประจำเดือน','monthly_expense_reports','report_id',r=>r.month_period,'file-bar-chart'],
+ ['voucher','ใบสำคัญจ่าย','disbursements','disbursement_id',r=>`${r.voucher_no} - ${r.payee_name}`,'file-check'],
+ ['f8708','แบบ 8708 ใบเบิกค่าใช้จ่ายเดินทางไปราชการ','form_8708_travel','form_8708_id',r=>`${r.traveler_name} - ${r.destination}`,'plane'],
+ ['f8708b','แบบ 8708 ส่วนที่ 2 หลักฐานการจ่ายเงิน','form_8708_travel','form_8708_id',r=>`${r.traveler_name}`,'list-checks'],
+ ['f8500','สัญญายืมเงิน (แบบ 8500)','form_8500_loans','loan_id',r=>`${r.contract_no} (${money(r.amount_borrowed)})`,'file-signature'],
+ ['bk111','ใบรับรองแทนใบเสร็จรับเงิน (บก.111)','form_bk111','bk111_id',r=>`${r.vendor_name} - ${money(r.amount)}`,'file-text'],
+ ['expmonth','รายงานจ่ายเงินประจำเดือน','monthly_expense_reports','report_id',r=>r.month_period,'clipboard-list'],
+ ['plan','แผนจัดซื้อจัดจ้างประจำปี','procurement_plans','plan_id',r=>r.plan_name,'calendar-range'],
+ ['pr','รายงานขอซื้อขอจ้าง','purchase_requests','pr_id',r=>`${r.pr_no} - ${r.purpose||''}`,'shopping-cart'],
+ ['quote','ใบเสนอราคา','quotations','quotation_id',r=>`เสนอ ${money(r.offered_price)}`,'gavel'],
+ ['po','ใบสั่งซื้อ/สั่งจ้าง','purchase_orders','po_id',r=>r.po_no,'file-input'],
+ ['contract','สัญญาซื้อขาย/จ้างทำของ','purchase_orders','po_id',r=>r.contract_no||r.po_no,'scroll-text'],
+ ['inspect','ใบตรวจรับพัสดุ','asset_inspections','inspection_id',r=>`ตรวจรับ ${r.inspection_date}`,'clipboard-check'],
+ ['asset','ทะเบียนคุมทรัพย์สิน','assets','asset_id',r=>`${r.asset_code} - ${r.asset_name}`,'boxes'],
+ ['assetreq','ใบเบิกพัสดุ','assets','asset_id',r=>`${r.asset_code} - ${r.asset_name}`,'package-open'],
+ ['disposal','รายงานขออนุมัติจำหน่ายครุภัณฑ์','asset_disposals','disposal_id',r=>`${r.approval_no||''} ${r.method}`,'trash-2'],
+ ['budreq','คำของบประมาณประจำปี','budget_requests','req_id',r=>`${r.project_code} ${r.project_name}`,'file-plus'],
+ ['alloc','แบบรายงานการจัดสรรงบประมาณ','budget_allocations','allocation_id',r=>`${r.project_code} ${r.project_name}`,'coins'],
+ ['transfer','บันทึกขออนุมัติโอนเปลี่ยนแปลงงบประมาณ','budget_transfers','transfer_id',r=>`โอน ${money(r.transfer_amount)}`,'arrow-left-right'],
+ ['areareport','รายงานการใช้จ่ายงบประมาณส่ง สพป./สพม.','budget_reports_area','area_report_id',r=>r.report_period,'send'],
+ ['memo','บันทึกข้อความ (ทั่วไป)',null,null,null,'file-pen']
+];
+function renderDocs(){
+  $('view').innerHTML=`<div class="card p-4 mb-3 bg-gradient-to-r from-gov-700 to-gov-600 text-white border-0">
+      <p class="font-medium text-sm flex items-center gap-2"><i data-lucide="sparkles" class="w-4 h-4"></i> สร้างเอกสารราชการ ${DOC_TYPES.length} ประเภท</p>
+      <p class="text-xs text-gov-100 mt-1">ทุกเอกสารแนบตราครุฑ เลขที่ วันที่แบบไทย จำนวนเงินเป็นตัวอักษร และลายเซ็นอิเล็กทรอนิกส์อัตโนมัติ</p>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+    ${DOC_TYPES.map((d,i)=>`<button onclick="pickDoc('${d[0]}')" class="card p-3.5 text-left hover:shadow-md hover:border-gov-300 transition active:scale-[.99]">
+      <div class="flex items-start gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gov-50 text-gov-700 flex items-center justify-center shrink-0"><i data-lucide="${d[5]}" class="w-4.5 h-4.5"></i></div>
+        <div class="min-w-0"><p class="text-[11px] text-slate-400">เอกสารที่ ${i+1}</p><p class="text-sm font-medium text-gov-900 leading-snug">${d[1]}</p></div>
+      </div></button>`).join('')}</div>`;
+  icons();
+}
+async function pickDoc(code){
+  const d=DOC_TYPES.find(x=>x[0]===code);
+  if(!d[2]) return printDocument(code,{});
+  showLoader('กำลังโหลดรายการ...');
+  try{
+    const rows=await dbGet(d[2],{order:d[3],asc:false,limit:200});
+    if(!rows.length){ toast('ยังไม่มีข้อมูลสำหรับเอกสารนี้','warn'); return; }
+    openModal('เลือกข้อมูลสำหรับ: '+d[1],
+      `<label class="text-xs font-medium text-slate-600">เลือกรายการ</label>
+       <select id="docPick" class="inp mt-1">${rows.map(r=>`<option value="${r[d[3]]}">${esc(d[4](r))}</option>`).join('')}</select>
+       <p class="text-[11px] text-slate-400 mt-2">ระบบจะแนบตราครุฑและลายเซ็นของคุณอัตโนมัติ</p>`,
+      [{t:'ยกเลิก',c:'btn-g',fn:closeModal},
+       {t:'<i data-lucide="printer" class="w-4 h-4"></i> สร้างเอกสาร',c:'btn-p',fn:async()=>{
+          const id=$('docPick').value; const rec=rows.find(r=>String(r[d[3]])===String(id));
+          closeModal(); printDocument(code,rec); }}]);
+  }catch(e){ toast(e.message,'error'); } finally{ hideLoader(); }
+}
+function printRec(key,id){
+  const r=RES[key]; const rows=listState[key]?._rows||[];
+  const rec=rows.find(x=>String(x[r.pk])===String(id));
+  if(!rec) return toast('ไม่พบข้อมูล','error');
+  printDocument(r.doc, rec);
+}
+async function printDocument(code, rec){
+  showLoader('กำลังสร้างเอกสาร...');
+  try{
+    const d=DOC_TYPES.find(x=>x[0]===code)||['','เอกสารราชการ'];
+    const set=await refData('system_settings');
+    const S=k=>set.find(s=>s.setting_key===k)?.setting_value||'';
+    const amtKey=['total_amount','amount','allocated_amount','amount_borrowed','requested_amount','transfer_amount','offered_price','sale_amount','estimated_budget','total_estimated_price','disbursed_total','total_paid','unit_price'].find(k=>rec?.[k]!=null);
+    const amt=amtKey? rec[amtKey] : null;
+    const labelOf=k=>{ for(const r of Object.values(RES)){ const f=r.f.find(x=>x[0]===k); if(f) return f[1]; } return k; };
+    const skip=['created_at','fiscal_year_id','summary_data_json'];
+    const body=Object.entries(rec||{}).filter(([k,v])=>!k.endsWith('_id')&&!skip.includes(k)&&v!==null&&v!==''&&typeof v!=='object')
+      .map(([k,v])=>{
+        let val=v;
+        if(typeof v==='boolean') val=v?'ใช่':'ไม่ใช่';
+        else if(/date/.test(k)) val=fmtDateFull(v);
+        else if(typeof v==='number') val=money(v);
+        return `<tr><td class="lb">${esc(labelOf(k))}</td><td>${esc(val)}</td></tr>`;
+      }).join('');
+    const sig=state.user?.signature_url;
+    const html=`<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><title>${d[1]}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+      *{box-sizing:border-box}
+      body{font-family:'Sarabun',serif;font-size:16px;color:#000;margin:0;padding:2.5cm 2cm;background:#fff}
+      .grd{display:block;margin:0 auto 6px;height:70px}
+      .grdtxt{text-align:center;font-weight:700;font-size:18px;margin-bottom:6px}
+      h1{text-align:center;font-size:20px;margin:4px 0 2px}
+      .sub{text-align:center;font-size:15px;margin-bottom:16px}
+      table{width:100%;border-collapse:collapse;margin-top:10px}
+      td{border:1px solid #333;padding:6px 8px;font-size:15px;vertical-align:top}
+      td.lb{width:38%;background:#f4f4f4;font-weight:700}
+      .amt{margin-top:14px;border:2px solid #000;padding:10px;text-align:center;font-weight:700;font-size:17px}
+      .sigwrap{margin-top:46px;display:flex;justify-content:space-around;text-align:center;font-size:15px}
+      .sigbox{width:44%}
+      .sigimg{height:52px;object-fit:contain;margin-bottom:-6px}
+      .line{border-bottom:1px dotted #000;margin:6px 24px 4px}
+      .ft{margin-top:28px;font-size:12px;color:#555;text-align:center;border-top:1px solid #ddd;padding-top:8px}
+      @media print{ .noprint{display:none} body{padding:1.6cm} }
+      .noprint{position:fixed;top:10px;right:10px}
+      .btn{font-family:'Sarabun';padding:8px 16px;background:#1f4d94;color:#fff;border:0;border-radius:8px;cursor:pointer}
+    </style></head><body>
+    <div class="noprint"><button class="btn" onclick="window.print()">🖨️ พิมพ์เอกสาร</button></div>
+    <img src="${GARUDA}" class="grd" alt="ตราครุฑ" onerror="this.outerHTML='<div class=grdtxt>[ ตราครุฑ ]</div>'">
+    <h1>${d[1]}</h1>
+    <div class="sub">${esc(S('school_name')||'สถานศึกษา')}<br>${esc(S('school_address')||'')}<br>${esc(S('school_area')||'')}</div>
+    <div style="font-size:15px">เขียนที่ ${esc(S('school_name')||'-')} &nbsp;&nbsp; วันที่ ${fmtDateFull(new Date())} &nbsp;&nbsp; ปีงบประมาณ ${thaiFiscalYear()}</div>
+    <table>${body||'<tr><td colspan="2" style="text-align:center">(เอกสารเปล่า — กรอกข้อมูลด้วยมือ)</td></tr>'}</table>
+    ${amt!=null?`<div class="amt">จำนวนเงิน ${money(amt)} บาท<br>( ${bahtText(amt)} )</div>`:''}
+    <div class="sigwrap">
+      <div class="sigbox">
+        ${sig?`<img src="${sig}" class="sigimg" onerror="this.outerHTML='<div style=height:52px></div>'">`:'<div style="height:52px"></div>'}
+        <div class="line"></div>( ${esc(state.user?.fullname||'')} )<br>${esc(state.user?.position||'ผู้จัดทำ')}
+      </div>
+      <div class="sigbox"><div style="height:52px"></div><div class="line"></div>( ............................................ )<br>ผู้อำนวยการโรงเรียน</div>
+    </div>
+    <div class="ft">เอกสารนี้สร้างโดยระบบอัจฉริยะการเงินและบัญชีสถานศึกษา • ${new Date().toLocaleString('th-TH')}</div>
+    </body></html>`;
+    const w=window.open('','_blank');
+    if(!w){ toast('เบราว์เซอร์บล็อกป๊อปอัป กรุณาอนุญาต','warn'); return; }
+    w.document.write(html); w.document.close();
+    logAudit('PRINT', d[2]||'-', rec?.[d[3]]||'', 'พิมพ์เอกสาร: '+d[1]);
+    toast('สร้างเอกสารเรียบร้อย');
+  }catch(e){ toast('สร้างเอกสารไม่สำเร็จ: '+e.message,'error'); }
+  finally{ hideLoader(); }
+}
+
+/* ============================================================
+   BOOT
+============================================================ */
+document.addEventListener('DOMContentLoaded', async ()=>{
+  icons();
+  if(typeof SUPABASE_URL==='undefined' || SUPABASE_URL.includes('xxxx')){
+    toast('กรุณาตั้งค่า SUPABASE_URL และ SUPABASE_ANON_KEY ในไฟล์ config.js','warn');
+  }
+  await initLanding();
+});
+</script>
+</body>
+</html>
